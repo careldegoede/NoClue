@@ -5,14 +5,14 @@ namespace NoClue.UI
 {
     /// <summary>
     /// Full-screen atmosphere for the spooky mansion theme, built from generated textures (no art needed):
-    /// drifting fog behind the UI, a candle-flicker vignette and light film grain in front of it,
+    /// drifting fog behind the UI and a candle-flicker vignette in front of it,
     /// plus <see cref="Flash"/> and <see cref="Shake"/> for dramatic moments.
     /// </summary>
     public sealed class ScreenFx : MonoBehaviour
     {
         public static ScreenFx Instance { get; private set; }
 
-        private RawImage _fog, _grain;
+        private RawImage _fog;
         private Image _vignette, _flash;
         private RectTransform _shakeTarget;
         private float _flashStart = -1, _flashSeconds;
@@ -36,10 +36,6 @@ namespace NoClue.UI
             fx._vignette = Layer<Image>(canvas, "Vignette");
             fx._vignette.sprite = VignetteSprite(256);
             fx._vignette.color = new Color(0.02f, 0.0f, 0.01f, 0.9f);
-
-            fx._grain = Layer<RawImage>(canvas, "Grain");
-            fx._grain.texture = GrainTexture(128);
-            fx._grain.color = new Color(1, 1, 1, 0.006f);
 
             fx._flash = Layer<Image>(canvas, "Flash");
             fx._flash.color = new Color(0, 0, 0, 0);
@@ -76,9 +72,6 @@ namespace NoClue.UI
             fr.x = now * 0.008f;
             fr.y = Mathf.Sin(now * 0.05f) * 0.05f;
             _fog.uvRect = fr;
-
-            // grain jumps every frame so it shimmers like film
-            _grain.uvRect = new Rect(Random.value, Random.value, Screen.width / 256f, Screen.height / 256f);
 
             if (_flashStart >= 0)
             {
@@ -162,23 +155,5 @@ namespace NoClue.UI
             return tex;
         }
 
-        private static Texture2D GrainTexture(int size)
-        {
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
-                wrapMode = TextureWrapMode.Repeat,
-                filterMode = FilterMode.Point,
-            };
-            var px = new Color32[size * size];
-            var rng = new System.Random(7);
-            for (int i = 0; i < px.Length; i++)
-            {
-                byte g = (byte)rng.Next(256);
-                px[i] = new Color32(g, g, g, 255);
-            }
-            tex.SetPixels32(px);
-            tex.Apply();
-            return tex;
-        }
     }
 }

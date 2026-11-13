@@ -52,7 +52,7 @@ namespace NoClue.UI
 
         private void Build(int size)
         {
-            _texture = new RenderTexture(size, size, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4 };
+            _texture = new RenderTexture(size, size, 24, RenderTextureFormat.ARGB32) { antiAliasing = 2 };
 
             var camGo = new GameObject("Die Camera") { layer = Layer };
             camGo.transform.SetParent(transform, false);
@@ -67,6 +67,7 @@ namespace NoClue.UI
             _camera.allowHDR = false;
             _camera.allowMSAA = true;
             _camera.targetTexture = _texture;
+            _camera.enabled = false;   // only renders while rolling (and once when it settles): easy on weak GPUs
 
             // keep the die out of every other camera
             foreach (var cam in Camera.allCameras)
@@ -159,6 +160,7 @@ namespace NoClue.UI
             _die.localRotation = _target;
             _die.localPosition = Vector3.zero;
             Shade();
+            _camera.Render();   // one still frame
         }
 
         /// <summary>Tumbles the die and lands it on <paramref name="side"/>; <paramref name="onLanded"/> fires when it stops.</summary>
@@ -169,6 +171,7 @@ namespace NoClue.UI
             _spinDegrees = 900 + UnityEngine.Random.Range(0, 360);
             _rollStart = Time.unscaledTime;
             _onLanded = onLanded;
+            _camera.enabled = true;
         }
 
         private void Update()
@@ -185,6 +188,8 @@ namespace NoClue.UI
             if (t >= 1)
             {
                 _rollStart = -1;
+                _camera.enabled = false;
+                _camera.Render();   // keep the landed face in the texture
                 var done = _onLanded;
                 _onLanded = null;
                 done?.Invoke();

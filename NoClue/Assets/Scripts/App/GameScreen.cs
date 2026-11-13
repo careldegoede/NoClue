@@ -641,12 +641,22 @@ namespace NoClue.App
             _rollCloseAt = -1;
             _app.PlaySfx("dice-gambling");
             int side = _view.rollSide;
+
+            // who the question goes to (already decided by the host): "Asking Mom!" reads better than "ASK NEXT!"
+            var asked = _view.ask.active ? Player(_view.ask.responderId) : null;
+            string askedName = asked == null ? null : asked.id == _view.myPlayerId ? "you" : asked.name;
+
             _die.Roll(side, () =>
             {
                 var face = Die.FaceOf(side);
                 if (_rollResult != null)
                 {
-                    _rollResult.text = Die.Label(face) + "!";
+                    _rollResult.text = face switch
+                    {
+                        DieFace.AskNext when askedName != null => $"Asking {askedName}!",
+                        DieFace.Reverse when askedName != null => $"Reverse! Asking {askedName}",
+                        _ => Die.Label(face) + "!",
+                    };
                     _rollResult.color = DieView.FaceColor(face);
                 }
                 _rollCloseAt = Time.unscaledTime + 1.4f;   // let everyone read the result
