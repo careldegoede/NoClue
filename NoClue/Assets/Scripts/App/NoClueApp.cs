@@ -33,7 +33,16 @@ namespace NoClue.App
         private AudioSource _music;
         private AudioSource _sfx;
         private readonly Dictionary<string, AudioClip> _clips = new();
-        private float _musicTarget = 0.6f;
+
+        // Music: the intro loop on menus/lobby; a shuffled playlist (Resources/Audio/Game) while playing.
+        private enum MusicMode { Intro, Game }
+        private const float IntroVolume = 0.6f;
+        private const float GameVolume = 0.35f;   // under the dice / voice effects
+        private MusicMode _musicMode = MusicMode.Intro;
+        private bool _musicSwitching;             // fading out before changing track set
+        private AudioClip _introClip;
+        private AudioClip[] _gameTracks = Array.Empty<AudioClip>();
+        private int _lastGameTrack = -1;
         private readonly List<Envelope> _inbox = new();
         private (GameObject go, float until)? _toast;
 
@@ -92,14 +101,63 @@ namespace NoClue.App
         private void BuildMusic()
         {
             _music = gameObject.AddComponent<AudioSource>();
-            _music.clip = Resources.Load<AudioClip>("Audio/introbackground");
-            _music.loop = true;
             _music.volume = 0;
-            if (_music.clip != null) _music.Play();
-            else Debug.LogWarning("[NoClue] Intro music not found at Resources/Audio/introbackground");
+            _introClip = Resources.Load<AudioClip>("Audio/introbackground");
+            if (_introClip == null) Debug.LogWarning("[NoClue] Intro music not found at Resources/Audio/introbackground");
+            _gameTracks = Resources.LoadAll<AudioClip>("Audio/Game");
+            StartMusicForMode();
 
             _sfx = gameObject.AddComponent<AudioSource>();
             _sfx.playOnAwake = false;
+        }
+
+        private void SetMusic(MusicMode mode)
+        {
+            if (mode == _musicMode) return;
+            _musicMode = mode;
+            _musicSwitching = true;   // fade out, then Update() starts the new music
+        }
+
+        private void StartMusicForMode()
+        {
+            if (_musicMode == MusicMode.Game && _gameTracks.Length > 0)
+            {
+                PlayNextGameTrack();
+                return;
+            }
+            _music.clip = _introClip;
+            _music.loop = true;
+            if (_introClip != null) _music.Play();
+        }
+
+        /// <summary>A random gameplay track, never the same one twice in a row.</summary>
+        private void PlayNextGameTrack()
+        {
+            int next = UnityEngine.Random.Range(0, _gameTracks.Length);
+            if (_gameTracks.Length > 1 && next == _lastGameTrack)
+                next = (next + UnityEngine.Random.Range(1, _gameTracks.Length)) % _gameTracks.Length;
+            _lastGameTrack = next;
+            _music.clip = _gameTracks[next];
+            _music.loop = false;
+            _music.Play();
+        }
+
+        private void UpdateMusic()
+        {
+            if (_music == null) return;
+            float target = _musicSwitching ? 0f : _musicMode == MusicMode.Game ? GameVolume : IntroVolume;
+            _music.volume = Mathf.MoveTowards(_music.volume, target, Time.unscaledDeltaTime * 0.5f);
+
+            if (_musicSwitching)
+            {
+                if (_music.volume > 0.001f) return;
+                _musicSwitching = false;
+                StartMusicForMode();
+            }
+            else if (_musicMode == MusicMode.Game && _gameTracks.Length > 0 && !_music.isPlaying)
+            {
+                PlayNextGameTrack();   // track finished: shuffle to the next one
+            }
         }
 
         /// <summary>Plays a sound effect from Resources/Audio/&lt;name&gt; (missing clips are ignored).</summary>
@@ -119,14 +177,14 @@ namespace NoClue.App
         public void ShowMenu()
         {
             EndSession();
-            _musicTarget = 0.6f;
+            SetMusic(MusicMode.Intro);
             SetScreen(new MenuScreen(this, _screenRoot));
         }
 
         public void ShowBrowse()
         {
             EndSession();
-            _musicTarget = 0.6f;
+            SetMusic(MusicMode.Intro);
             SetScreen(new BrowseScreen(this, _screenRoot));
         }
 
@@ -205,7 +263,7 @@ namespace NoClue.App
 
         private void Update()
         {
-            if (_music != null) _music.volume = Mathf.MoveTowards(_music.volume, _musicTarget, Time.unscaledDeltaTime * 0.4f);
+            UpdateMusic();
 
             if (Session != null)
             {
@@ -271,12 +329,12 @@ namespace NoClue.App
             View = view;
             if (view.phase == Phase.Lobby)
             {
-                _musicTarget = 0.6f;
+                SetMusic(MusicMode.Intro);
                 if (_screen is not LobbyScreen) SetScreen(new LobbyScreen(this, _screenRoot));
             }
             else
             {
-                _musicTarget = 0.12f;
+                SetMusic(MusicMode.Game);
                 if (_screen is not GameScreen) SetScreen(new GameScreen(this, _screenRoot));
             }
             _screen.Refresh(view);

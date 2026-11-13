@@ -32,9 +32,9 @@ namespace NoClue.EditorTools
 
             var importer = (AudioImporter)assetImporter;
             var settings = importer.defaultSampleSettings;
-            if (assetPath.Contains("introbackground"))
+            if (assetPath.Contains("introbackground") || assetPath.StartsWith(AudioPath + "Game/"))
             {
-                // long music: stream from disk instead of holding ~36 MB in memory
+                // music: stream from disk instead of holding tens of MB in memory
                 settings.loadType = AudioClipLoadType.Streaming;
                 settings.compressionFormat = AudioCompressionFormat.Vorbis;
                 settings.quality = 0.7f;
