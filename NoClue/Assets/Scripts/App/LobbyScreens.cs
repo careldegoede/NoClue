@@ -121,11 +121,13 @@ namespace NoClue.App
             Ui.Size(manual, -1, 80);
             Ui.HLayout(manual, 16);
             Ui.Size(Ui.Label(manual, "Or enter the host's IP:", 28, Ui.TextDim).rectTransform, 300, 76);
-            var ip = Ui.Input(manual, "192.168.1.20", "", 420);
+            var ip = Ui.Input(manual, "192.168.1.20", PlayerPrefs.GetString("noclue.lastIp", ""), 420);
             Ui.Button(manual, "Join", () =>
             {
                 string text = ip.text.Trim();
                 if (text.Length == 0) return;
+                PlayerPrefs.SetString("noclue.lastIp", text);   // remembered for next time
+                PlayerPrefs.Save();
                 int port = TcpHostServer.DefaultPort;
                 int colon = text.LastIndexOf(':');
                 if (colon > 0 && int.TryParse(text.Substring(colon + 1), out int p)) { port = p; text = text.Substring(0, colon); }

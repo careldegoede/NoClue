@@ -1,0 +1,2 @@
+D:\repos\Unity\NoClue\NoClue\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\CMakeLists.txt
+D:\repos\Unity\NoClue\NoClue\Library\Bee\Android\Prj\IL2CPP\Gradle\unityLibrary\src\main\cpp\GameActivity\CMakeLists.txt

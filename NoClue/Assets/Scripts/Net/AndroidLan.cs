@@ -37,6 +37,34 @@ namespace NoClue.Net
 #endif
         }
 
+        /// <summary>The phone's Wi-Fi address and netmask from WifiManager (Android only; false elsewhere).</summary>
+        public static bool TryGetWifi(out System.Net.IPAddress ip, out System.Net.IPAddress mask)
+        {
+            ip = mask = null;
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+                using var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
+                using var wifi = activity.Call<AndroidJavaObject>("getSystemService", "wifi");
+                using var dhcp = wifi.Call<AndroidJavaObject>("getDhcpInfo");
+                int addr = dhcp.Get<int>("ipAddress");
+                int net = dhcp.Get<int>("netmask");
+                if (addr == 0) return false;
+                if (net == 0) net = 0x00FFFFFF;   // some phones report 0: assume /24
+                // DhcpInfo ints are little-endian: first byte of the address is the lowest byte
+                ip = new System.Net.IPAddress(System.BitConverter.GetBytes(addr));
+                mask = new System.Net.IPAddress(System.BitConverter.GetBytes(net));
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("[NoClue] Wi-Fi info unavailable: " + e.Message);
+            }
+#endif
+            return false;
+        }
+
         public static void Release()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
