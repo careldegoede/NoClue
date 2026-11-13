@@ -116,6 +116,7 @@ namespace NoClue.App
             Ui.Flex(_picksLabel, 1);
             _spin = Ui.Button(bar, "Spin the die!", () => Send(MsgType.Roll), width: 330, height: 92, fontSize: 32);
             _accuse = Ui.Button(bar, "Accuse", ShowAccuseConfirm, Ui.Danger, width: 250, height: 92, fontSize: 32);
+            Ui.Button(bar, "My Cards", OpenCardsOverlay, Ui.Blue, width: 230, height: 92, fontSize: 28);
             Ui.Button(bar, "Log", ToggleLog, Ui.PanelLight, width: 150, height: 92, fontSize: 28);
             Ui.Button(bar, "Leave", app.Leave, Ui.PanelLight, width: 170, height: 92, fontSize: 28);
 
@@ -384,21 +385,144 @@ namespace NoClue.App
         private void RefreshCards()
         {
             var notes = _view.notes.ToDictionary(n => n.cardId);
-            foreach (var (id, card) in _cards)
+            foreach (var (id, card) in _cards) ApplyCardState(card, id, notes, _picked);
+            RefreshCardsOverlay();
+        }
+
+        /// <summary>Tags, selection and suspect mark for one card (shared by the rows and My Cards).</summary>
+        private void ApplyCardState(CardWidget card, string id, Dictionary<string, CardNote> notes,
+            Dictionary<CardType, string> picked)
+        {
+            notes.TryGetValue(id, out var note);
+            card.SetNote(note, note != null ? Player(note.byPlayerId) : null);
+
+            bool selecting = IsMyTurnAndFree();
+            card.SetInteractable(selecting);
+            card.SetSelected(selecting && picked.TryGetValue(CardCatalog.TypeOf(id), out var sel) && sel == id);
+            card.SetDimmed(false);
+
+            // only unknown cards can be suspects; a known card drops its mark
+            bool unknown = note == null || note.kind == NoteKind.None;
+            card.SetSuspectAvailable(unknown && _view.phase == Phase.Playing);
+            card.SetSuspect(unknown && _suspects.Contains(id));
+        }
+
+        // ------------------------------------------------------------------ "My Cards": everything on one screen
+
+        private GameObject _cardsOverlay;
+        private readonly Dictionary<string, CardWidget> _overlayCards = new();
+        private readonly Dictionary<CardType, string> _overlayPicked = new();
+        private Text _overlayPicks;
+        private Button _overlayOk;
+        private bool _ownedOnly;
+
+        private void OpenCardsOverlay()
+        {
+            if (_cardsOverlay != null) return;
+            _overlayPicked.Clear();
+            foreach (var p in _picked) _overlayPicked[p.Key] = p.Value;
+            _overlayCards.Clear();
+
+            var dim = Ui.Panel(_root, "MyCards", new Color(0.04f, 0, 0.01f, 0.88f));
+            Ui.Stretch(dim);
+            _cardsOverlay = dim.gameObject;
+            var box = Ui.Panel(dim, "Box", Ui.PanelColor);
+            Ui.Stretch(box, 30, 24, 30, 24);
+            Ui.StyleFrame(box);
+            box.gameObject.AddComponent<PopIn>();
+            Ui.VLayout(box, 10, 20, TextAnchor.UpperCenter);
+
+            // header: title, filter toggle, current picks
+            var header = Ui.Rect(box, "Header");
+            Ui.Size(header, -1, 70);
+            Ui.HLayout(header, 16, 0, TextAnchor.MiddleLeft);
+            Ui.Size(Ui.Label(header, "My Cards", 44, Ui.Accent, TextAnchor.MiddleLeft, FontStyle.Bold).rectTransform, 330, 66);
+            var filter = Ui.Button(header, _ownedOnly ? "Show all" : "Owned only", null, Ui.PanelLight, 24, 220, 60);
+            filter.onClick.AddListener(() =>
             {
-                notes.TryGetValue(id, out var note);
-                card.SetNote(note, note != null ? Player(note.byPlayerId) : null);
+                _ownedOnly = !_ownedOnly;
+                Ui.SetButtonLabel(filter, _ownedOnly ? "Show all" : "Owned only");
+                RefreshCardsOverlay();
+            });
+            _overlayPicks = Ui.Label(header, "", 26, Ui.TextColor, TextAnchor.MiddleRight);
+            _overlayPicks.supportRichText = true;
+            Ui.Flex(_overlayPicks, 1);
 
-                bool selecting = IsMyTurnAndFree();
-                card.SetInteractable(selecting);
-                card.SetSelected(selecting && _picked.TryGetValue(CardCatalog.TypeOf(id), out var sel) && sel == id);
-                card.SetDimmed(false);
-
-                // only unknown cards can be suspects; a known card drops its mark
-                bool unknown = note == null || note.kind == NoteKind.None;
-                card.SetSuspectAvailable(unknown && _view.phase == Phase.Playing);
-                card.SetSuspect(unknown && _suspects.Contains(id));
+            // all cards, three sections, scrollable
+            var area = Ui.Rect(box, "Area");
+            Ui.Flex(area, 1, 1);
+            var content = Ui.ScrollArea(area, "Scroll", out _);
+            Ui.Stretch((RectTransform)content.parent.parent);
+            Ui.VLayout(content, 8, 0, TextAnchor.UpperCenter);
+            Ui.FitHeight(content);
+            foreach (var (type, title) in new[] { (CardType.Character, "Characters"), (CardType.Room, "Rooms"), (CardType.Weapon, "Weapons") })
+            {
+                Ui.Size(Ui.Label(content, title, 28, Ui.Accent, TextAnchor.LowerCenter, FontStyle.Bold).rectTransform, -1, 40);
+                var grid = Ui.Rect(content, title);
+                // 3 big cards per row, scroll up/down: same feel on a phone as on the PC
+                var g = Ui.Grid(grid, new Vector2(270, 386), 18, TextAnchor.UpperCenter);
+                g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                g.constraintCount = 3;
+                Ui.FitHeight(grid);
+                foreach (var id in CardCatalog.OfType(type))
+                    _overlayCards[id] = new CardWidget(grid, id, OverlayPick, ToggleSuspect);
             }
+
+            // footer
+            var footer = Ui.Rect(box, "Footer");
+            Ui.Size(footer, -1, 86);
+            Ui.HLayout(footer, 20, 0, TextAnchor.MiddleCenter);
+            Ui.Button(footer, "Cancel", CloseCardsOverlay, Ui.PanelLight, width: 280, height: 80);
+            _overlayOk = Ui.Button(footer, "OK", () =>
+            {
+                if (IsMyTurnAndFree())
+                {
+                    _picked.Clear();
+                    foreach (var p in _overlayPicked) _picked[p.Key] = p.Value;
+                    foreach (var p in _picked) _rows[p.Key].Reveal(System.Array.IndexOf(CardCatalog.OfType(p.Key), p.Value));
+                }
+                CloseCardsOverlay();
+                Redraw();
+            }, width: 280, height: 80);
+
+            RefreshCardsOverlay();
+        }
+
+        private void CloseCardsOverlay()
+        {
+            if (_cardsOverlay != null) Object.Destroy(_cardsOverlay);
+            _cardsOverlay = null;
+            _overlayCards.Clear();
+        }
+
+        private void OverlayPick(string id)
+        {
+            if (!IsMyTurnAndFree()) return;
+            var type = CardCatalog.TypeOf(id);
+            if (_overlayPicked.TryGetValue(type, out var current) && current == id) _overlayPicked.Remove(type);
+            else _overlayPicked[type] = id;
+            RefreshCardsOverlay();
+        }
+
+        private void RefreshCardsOverlay()
+        {
+            if (_cardsOverlay == null) return;
+            var notes = _view.notes.ToDictionary(n => n.cardId);
+            foreach (var (id, card) in _overlayCards)
+            {
+                ApplyCardState(card, id, notes, _overlayPicked);
+                bool owned = notes.TryGetValue(id, out var n) && n.kind == NoteKind.Owned;
+                card.Root.gameObject.SetActive(!_ownedOnly || owned);
+            }
+
+            bool myTurn = IsMyTurnAndFree();
+            string Pick(CardType t) => _overlayPicked.TryGetValue(t, out var id)
+                ? $"<color=#C9A04A>{CardCatalog.DisplayName(id)}</color>"
+                : $"<color=#9D917C>{t.ToString().ToLower()}?</color>";
+            _overlayPicks.text = myTurn
+                ? $"{Pick(CardType.Character)}  ·  {Pick(CardType.Room)}  ·  {Pick(CardType.Weapon)}"
+                : "<color=#9D917C>Viewing only: it's not your turn.</color>";
+            Ui.SetButtonLabel(_overlayOk, myTurn ? "OK" : "Close");
         }
 
         // ------------------------------------------------------------------ suspects (private notebook)
