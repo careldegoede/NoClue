@@ -9,21 +9,35 @@ using UnityEngine.UI;
 namespace NoClue.App
 {
     /// <summary>
-    /// The table: player strip, question banner, the player's card grid (characters / rooms / weapons),
-    /// the turn actions, and the pop-ups (answer a question, card shown to you, game over).
+    /// The table, laid out phone-first: player strip, banner, three swipeable card rows
+    /// (characters / rooms / weapons, 3 cards in view) and an action bar along the bottom.
+    /// Pop-ups handle questions, reveals, the die, the log, host decisions and game over.
     /// Everything is redrawn from the latest <see cref="GameView"/>.
     /// </summary>
     public sealed class GameScreen : NoClueApp.IScreen
     {
+        private const float CardAspect = 0.7f;   // card images range from 2:3 to 3:4
+
         private readonly NoClueApp _app;
         private readonly Transform _root;
         private readonly RectTransform _playerStrip;
         private readonly RectTransform _banner;
-        private readonly RectTransform _actions;
-        private readonly RectTransform _hostControls;
-        private readonly Text _log;
-        private readonly ScrollRect _logScroll;
         private readonly Dictionary<string, CardWidget> _cards = new();
+        private readonly Dictionary<CardType, Carousel> _rows = new();
+
+        // bottom action bar
+        private readonly Text _picksLabel;
+        private readonly Button _spin;
+        private readonly Button _accuse;
+
+        // log pop-up (opened from the action bar)
+        private GameObject _logModal;
+        private Text _logText;
+        private ScrollRect _logScroll;
+
+        // host: "X disconnected - wait or eject?" pop-up
+        private GameObject _hostModal;
+        private int _hostModalFor = -1;
 
         private GameView _view;
         private readonly Dictionary<CardType, string> _picked = new();
@@ -35,7 +49,6 @@ namespace NoClue.App
         // private notebook: cards I've marked as suspects (saved on this device per game + seat)
         private readonly HashSet<string> _suspects = new();
         private string _suspectPrefKey;
-        private readonly Text _suspectSummary;
         private GameObject _accuseModal;
         private readonly HashSet<int> _waitingOn = new();   // disconnected players the host chose to wait for
 
@@ -90,63 +103,73 @@ namespace NoClue.App
             _banner.offsetMax = new Vector2(-20, -196);
             Ui.HLayout(_banner, 14, 6, TextAnchor.MiddleCenter);
 
-            // ---- left: card grid
-            var gridHost = Ui.Rect(root, "Cards");
-            gridHost.anchorMin = Vector2.zero;
-            gridHost.anchorMax = Vector2.one;
-            gridHost.offsetMin = new Vector2(20, 20);
-            gridHost.offsetMax = new Vector2(-500, -300);
-            var content = Ui.ScrollArea(gridHost, "Scroll", out _);
-            Ui.Stretch((RectTransform)content.parent.parent);
-            Ui.VLayout(content, 10, 0, TextAnchor.UpperLeft);
-            Ui.FitHeight(content);
-            BuildSection(content, "Characters", CardType.Character);
-            BuildSection(content, "Rooms", CardType.Room);
-            BuildSection(content, "Weapons", CardType.Weapon);
+            // ---- bottom: action bar
+            var bar = Ui.Panel(root, "ActionBar", Ui.PanelColor);
+            bar.anchorMin = new Vector2(0, 0);
+            bar.anchorMax = new Vector2(1, 0);
+            bar.pivot = new Vector2(0.5f, 0);
+            bar.offsetMin = new Vector2(0, 0);
+            bar.offsetMax = new Vector2(0, 124);
+            Ui.HLayout(bar, 16, 16, TextAnchor.MiddleCenter);
+            _picksLabel = Ui.Label(bar, "", 26, Ui.TextColor, TextAnchor.MiddleLeft);
+            _picksLabel.supportRichText = true;
+            Ui.Flex(_picksLabel, 1);
+            _spin = Ui.Button(bar, "Spin the die!", () => Send(MsgType.Roll), width: 330, height: 92, fontSize: 32);
+            _accuse = Ui.Button(bar, "Accuse", ShowAccuseConfirm, Ui.Danger, width: 250, height: 92, fontSize: 32);
+            Ui.Button(bar, "Log", ToggleLog, Ui.PanelLight, width: 150, height: 92, fontSize: 28);
+            Ui.Button(bar, "Leave", app.Leave, Ui.PanelLight, width: 170, height: 92, fontSize: 28);
 
-            // ---- right: actions, host controls, log
-            var side = Ui.Panel(root, "Side", Ui.PanelColor);
-            side.anchorMin = new Vector2(1, 0);
-            side.anchorMax = new Vector2(1, 1);
-            side.pivot = new Vector2(1, 0.5f);
-            side.offsetMin = new Vector2(-470, 20);
-            side.offsetMax = new Vector2(-20, -300);
-            Ui.VLayout(side, 14, 20);
-            Ui.StyleFrame(side);
-
-            _actions = Ui.Rect(side, "Actions");
-            Ui.VLayout(_actions, 12);
-            Ui.FitHeight(_actions);
-
-            _hostControls = Ui.Rect(side, "HostControls");
-            Ui.VLayout(_hostControls, 8);
-            Ui.FitHeight(_hostControls);
-
-            _suspectSummary = Ui.Label(side, "", 22, Ui.TextColor, TextAnchor.UpperLeft);
-            _suspectSummary.supportRichText = true;   // the side panel's layout sizes it to its text
-
-            Ui.Size(Ui.Label(side, "What happened", 26, Ui.TextDim, TextAnchor.LowerLeft, FontStyle.Bold).rectTransform, -1, 36);
-            var logBox = Ui.Panel(side, "Log", Ui.Background);
-            Ui.Flex(logBox, 1, 1);
-            var logContent = Ui.ScrollArea(logBox, "Scroll", out _logScroll);
-            Ui.Stretch((RectTransform)logContent.parent.parent, 12, 10, 12, 10);
-            Ui.VLayout(logContent, 0);
-            Ui.FitHeight(logContent);
-            _log = Ui.Label(logContent, "", 22, Ui.TextColor, TextAnchor.UpperLeft);
-
-            Ui.Button(side, "Leave game", app.Leave, Ui.PanelLight, width: -1, height: 56, fontSize: 24);
+            // ---- middle: three swipeable card rows, 3 cards in view each
+            var rows = Ui.Rect(root, "Rows");
+            rows.anchorMin = Vector2.zero;
+            rows.anchorMax = Vector2.one;
+            rows.offsetMin = new Vector2(12, 132);
+            rows.offsetMax = new Vector2(-12, -296);
+            var v = Ui.VLayout(rows, 6);
+            v.childForceExpandHeight = true;
+            BuildRow(rows, "Characters", CardType.Character);
+            BuildRow(rows, "Rooms", CardType.Room);
+            BuildRow(rows, "Weapons", CardType.Weapon);
         }
 
-        private void BuildSection(RectTransform parent, string title, CardType type)
+        private void BuildRow(RectTransform parent, string title, CardType type)
         {
-            Ui.Size(Ui.Label(parent, title, 32, Ui.Accent, TextAnchor.LowerLeft, FontStyle.Bold).rectTransform, -1, 50);
-            var grid = Ui.Rect(parent, title + " Grid");
-            var g = Ui.Grid(grid, new Vector2(150, 200), 12);
-            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            g.constraintCount = 8;
-            Ui.FitHeight(grid);
+            var row = Ui.Rect(parent, title);
+            Ui.Flex(row, 1, 1);
+            Ui.VLayout(row, 0, 0, TextAnchor.UpperCenter);
+            Ui.Size(Ui.Label(row, title, 24, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 30);
+
+            var strip = Ui.Rect(row, "Strip");
+            Ui.Flex(strip, 1, 1);
+            Ui.HLayout(strip, 10, 0, TextAnchor.MiddleCenter);
+
+            var holder = Ui.Rect(strip, "Cards");
+            var holderLe = holder.gameObject.AddComponent<LayoutElement>();
+            holderLe.flexibleHeight = 1;   // fill the row's height
+            var fit = holder.gameObject.AddComponent<FitWidthToHeight>();
+            fit.Aspect = CardAspect;
+            fit.Items = 3;
+            fit.Reserved = 2 * 76 + 2 * 10;
+
+            var carousel = Carousel.Create(holder, title, itemsPerView: 3);
+            Ui.Stretch((RectTransform)carousel.transform);
+            _rows[type] = carousel;
+
+            // arrows either side (siblings in the strip; created after so they sit left/right)
+            var left = Ui.Button(strip, "«", carousel.Previous, new Color(0, 0, 0, 0.55f), 40, 76, 110);
+            left.transform.SetAsFirstSibling();
+            Ui.Button(strip, "»", carousel.Next, new Color(0, 0, 0, 0.55f), 40, 76, 110);
+
             foreach (var id in CardCatalog.OfType(type))
-                _cards[id] = new CardWidget(grid, id, OnCardClicked, ToggleSuspect);
+            {
+                var page = carousel.AddPage(id);
+                var inner = Ui.Stretch(Ui.Rect(page, "Slot"), 6, 4, 6, 4);
+                var card = new CardWidget(inner, id, OnCardClicked, ToggleSuspect);
+                var aspect = card.Root.gameObject.AddComponent<AspectRatioFitter>();
+                aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                aspect.aspectRatio = CardAspect;
+                _cards[id] = card;
+            }
         }
 
         // ------------------------------------------------------------------ refresh
@@ -175,11 +198,11 @@ namespace NoClue.App
             RefreshPlayers();
             RefreshBanner();
             RefreshCards();
-            RefreshActions();
-            RefreshHostControls();
+            RefreshActionBar();
             RefreshLog();
 
             if (_rolling) return;   // pop-ups wait until the die has landed
+            RefreshHostPrompt();
             RefreshAnswerModal();
             RefreshRevealChoiceModal();
             RefreshShownModal();
@@ -216,6 +239,15 @@ namespace NoClue.App
                 irt.anchoredPosition = new Vector2(0, -6);
                 irt.sizeDelta = new Vector2(66, 88);
                 if (!p.connected || p.eliminated || p.ejected) img.color = new Color(0.4f, 0.4f, 0.4f);
+
+                // host: tap a dropped player's chip to bring back the wait / eject choice
+                if (Me is { isHost: true } && !p.connected && !p.ejected && !p.eliminated && _view.phase == Phase.Playing)
+                {
+                    int dropId = p.id;
+                    var tap = chip.gameObject.AddComponent<Button>();
+                    Ui.AddClick(tap);
+                    tap.onClick.AddListener(() => { _waitingOn.Remove(dropId); RefreshHostPrompt(); });
+                }
 
                 string status = p.ejected ? "removed" : p.eliminated ? "OUT" : !p.connected ? "offline" :
                     active ? "turn" : asked ? "answering" : $"{p.handCount} cards";
@@ -367,7 +399,6 @@ namespace NoClue.App
                 card.SetSuspectAvailable(unknown && _view.phase == Phase.Playing);
                 card.SetSuspect(unknown && _suspects.Contains(id));
             }
-            RefreshSuspectSummary();
         }
 
         // ------------------------------------------------------------------ suspects (private notebook)
@@ -393,112 +424,101 @@ namespace NoClue.App
             RefreshCards();
         }
 
-        private void RefreshSuspectSummary()
+        // ------------------------------------------------------------------ bottom action bar
+
+        private void RefreshActionBar()
         {
-            var known = new HashSet<string>(_view.notes.Where(n => n.kind != NoteKind.None).Select(n => n.cardId));
-            var live = _suspects.Where(s => !known.Contains(s)).ToList();
-            if (_view.phase != Phase.Playing || live.Count == 0)
-            {
-                _suspectSummary.text = _view.phase == Phase.Playing
-                    ? "<color=#9AA0B0>Tip: tap ? on a card to mark it as a suspect.</color>"
-                    : "";
-                return;
-            }
-
-            string Line(CardType t, string label)
-            {
-                var names = live.Where(s => CardCatalog.TypeOf(s) == t).Select(CardCatalog.DisplayName).ToList();
-                return names.Count == 0 ? "" : $"\n{label}: <color=#C8504A>{string.Join(", ", names)}</color>";
-            }
-
-            _suspectSummary.text = "<b>Your suspects</b>" +
-                                   Line(CardType.Character, "Who") + Line(CardType.Room, "Where") + Line(CardType.Weapon, "With");
-        }
-
-        private void RefreshActions()
-        {
-            Ui.Clear(_actions);
             var me = Me;
-            if (_view.phase != Phase.Playing || me == null) return;
+            bool myTurn = IsMyTurnAndFree();
+            bool ready = myTurn && _picked.Count == 3;
+            SetEnabled(_spin, ready);
+            SetEnabled(_accuse, ready);
 
-            if (me.eliminated || me.ejected)
+            string text;
+            if (_view.phase != Phase.Playing || me == null) text = "";
+            else if (me.eliminated || me.ejected) text = "<color=#9D917C>You're out. Keep watching!</color>";
+            else if (myTurn)
             {
-                ActionText("You're out. Your cards are shown to everyone, and you can keep watching.");
+                string Pick(CardType t) => _picked.TryGetValue(t, out var id)
+                    ? $"<color=#C9A04A>{CardCatalog.DisplayName(id)}</color>"
+                    : $"<color=#9D917C>{t.ToString().ToLower()}?</color>";
+                text = $"{Pick(CardType.Character)}  ·  {Pick(CardType.Room)}  ·  {Pick(CardType.Weapon)}";
+            }
+            else if (_view.ask.active && _view.ask.responderId == me.id) text = "You're being asked: answer in the pop-up.";
+            else text = "<color=#9D917C>Swipe the rows to look at your cards. Tap ? to mark a suspect.</color>";
+            _picksLabel.text = text;
+        }
+
+        // ------------------------------------------------------------------ log pop-up
+
+        private void ToggleLog()
+        {
+            if (_logModal != null)
+            {
+                Object.Destroy(_logModal);
+                _logModal = null;
                 return;
             }
 
-            if (IsMyTurnAndFree())
-            {
-                ActionText("<b>Your turn.</b> Tap one character, one room and one weapon:");
-                foreach (CardType t in new[] { CardType.Character, CardType.Room, CardType.Weapon })
-                {
-                    string pick = _picked.TryGetValue(t, out var id)
-                        ? $"<color=#E0B04A>{CardCatalog.DisplayName(id)}</color>"
-                        : "<color=#9AA0B0>not chosen</color>";
-                    ActionText($"{t}: {pick}");
-                }
-
-                bool ready = _picked.Count == 3;
-                var spin = Ui.Button(_actions, "Spin the die!", () => Send(MsgType.Roll), width: -1, height: 76);
-                var accuse = Ui.Button(_actions, "Make an accusation", ShowAccuseConfirm, Ui.Danger, width: -1, height: 76);
-                SetEnabled(spin, ready);
-                SetEnabled(accuse, ready);
-                if (_picked.Count > 0)
-                    Ui.Button(_actions, "Clear selection", () => { _picked.Clear(); Redraw(); },
-                        Ui.PanelLight, width: -1, height: 56, fontSize: 24);
-            }
-            else if (_view.ask.active && _view.ask.responderId == me.id)
-            {
-                ActionText("You've been asked a question. Answer it in the pop-up.");
-            }
+            var box = Ui.Modal(_root, "Log", 1000, 820, out _logModal);
+            Ui.VLayout(box, 12, 28, TextAnchor.UpperCenter);
+            Ui.Size(Ui.Label(box, "What happened", 40, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 56);
+            var area = Ui.Panel(box, "Area", Ui.Background);
+            Ui.Flex(area, 1, 1);
+            var content = Ui.ScrollArea(area, "Scroll", out _logScroll);
+            Ui.Stretch((RectTransform)content.parent.parent, 16, 12, 16, 12);
+            Ui.VLayout(content, 0);
+            Ui.FitHeight(content);
+            _logText = Ui.Label(content, "", 24, Ui.TextColor, TextAnchor.UpperLeft);
+            Ui.Button(box, "Close", ToggleLog, Ui.PanelLight, width: 260, height: 76);
+            RefreshLog();
         }
-
-        private void ActionText(string text)
-        {
-            var t = Ui.Label(_actions, text, 24, Ui.TextColor);
-            t.supportRichText = true;
-            Ui.Size(t.rectTransform, -1, 40);
-        }
-
-        private void RefreshHostControls()
-        {
-            Ui.Clear(_hostControls);
-            if (Me is not { isHost: true } || _view.phase != Phase.Playing) return;
-
-            foreach (var p in _view.players.Where(p => !p.connected && !p.ejected && !p.eliminated))
-            {
-                if (_waitingOn.Contains(p.id))
-                {
-                    var row = Ui.Rect(_hostControls, "Waiting " + p.name);
-                    Ui.Size(row, -1, 50);
-                    Ui.HLayout(row, 10);
-                    var t = Ui.Label(row, $"Waiting for {p.name} to rejoin...", 22, Ui.TextDim);
-                    Ui.Flex(t, 1);
-                    Ui.Button(row, "Eject", () => Eject(p.id), Ui.Danger, 22, 110, 46);
-                    continue;
-                }
-
-                var box = Ui.Panel(_hostControls, "Disconnected " + p.name, Ui.Background);
-                Ui.VLayout(box, 8, 12);
-                Ui.FitHeight(box);
-                Ui.Size(Ui.Label(box, $"<b>{p.name}</b> disconnected.", 24, Ui.Danger).rectTransform, -1, 34)
-                    .GetComponent<Text>().supportRichText = true;
-                var buttons = Ui.Rect(box, "Buttons");
-                Ui.Size(buttons, -1, 56);
-                Ui.HLayout(buttons, 10);
-                int id = p.id;
-                Ui.Button(buttons, "Wait", () => { _waitingOn.Add(id); Redraw(); }, Ui.PanelLight, 24, 190, 56);
-                Ui.Button(buttons, "Eject", () => Eject(id), Ui.Danger, 24, 190, 56);
-            }
-        }
-
-        private void Eject(int playerId) => _app.Send(MsgType.EjectPlayer, new EjectPlayerMsg { playerId = playerId });
 
         private void RefreshLog()
         {
-            _log.text = string.Join("\n", _view.log);
+            if (_logModal == null || _logText == null) return;
+            _logText.text = string.Join("\n", _view.log);
             Canvas.ForceUpdateCanvases();
-            _logScroll.verticalNormalizedPosition = 0;
+            _logScroll.verticalNormalizedPosition = 0;   // newest at the bottom, in view
+        }
+
+        // ------------------------------------------------------------------ host: disconnected players
+
+        /// <summary>
+        /// Host only: when someone drops, ask "wait or eject?". "Wait" hides it; tapping their greyed-out
+        /// chip in the player strip asks again.
+        /// </summary>
+        private void RefreshHostPrompt()
+        {
+            bool host = Me is { isHost: true } && _view.phase == Phase.Playing;
+            var dropped = host
+                ? _view.players.FirstOrDefault(p => !p.connected && !p.ejected && !p.eliminated && !_waitingOn.Contains(p.id))
+                : null;
+
+            if (dropped == null || dropped.id != _hostModalFor)
+            {
+                if (_hostModal != null) Object.Destroy(_hostModal);
+                _hostModal = null;
+                _hostModalFor = -1;
+            }
+            if (dropped == null || _hostModal != null) return;
+
+            _hostModalFor = dropped.id;
+            int id = dropped.id;
+            var box = Ui.Modal(_root, "Disconnected", 860, 560, out _hostModal);
+            Ui.VLayout(box, 16, 30, TextAnchor.UpperCenter);
+            Ui.Size(Ui.Label(box, $"{dropped.name} disconnected", 44, Ui.Danger, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 60);
+            var portrait = Ui.Image(box, CardCatalog.GetSprite(dropped.characterId), "Portrait");
+            portrait.color = new Color(0.5f, 0.5f, 0.5f);
+            Ui.Size(portrait.rectTransform, -1, 190);
+            Ui.Size(Ui.Label(box, "Wait for them to rejoin, or remove them. If you remove them, their cards are shown to everyone.",
+                24, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, -1, 70);
+            var buttons = Ui.Rect(box, "Buttons");
+            Ui.Size(buttons, -1, 84);
+            Ui.HLayout(buttons, 20, 0, TextAnchor.MiddleCenter);
+            Ui.Button(buttons, "Wait", () => { _waitingOn.Add(id); RefreshHostPrompt(); }, Ui.PanelLight, width: 300, height: 80);
+            Ui.Button(buttons, "Eject", () => _app.Send(MsgType.EjectPlayer, new EjectPlayerMsg { playerId = id }),
+                Ui.Danger, width: 300, height: 80);
         }
 
         // ------------------------------------------------------------------ pop-ups
@@ -861,8 +881,7 @@ namespace NoClue.App
         private void Redraw()
         {
             RefreshCards();
-            RefreshActions();
-            RefreshHostControls();
+            RefreshActionBar();
         }
 
         // ------------------------------------------------------------------ helpers

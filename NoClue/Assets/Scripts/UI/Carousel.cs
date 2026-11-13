@@ -19,12 +19,17 @@ namespace NoClue.UI
         private readonly List<LayoutElement> _pages = new();
         private bool _dragging;
         private float _lastWheel;
+        private int _perView = 1;
 
+        /// <summary>Index of the first item in view.</summary>
         public int Page { get; private set; }
         public int PageCount => _pages.Count;
+        /// <summary>Last valid <see cref="Page"/> (when several items are in view at once).</summary>
+        public int MaxPage => Mathf.Max(0, _pages.Count - _perView);
         public event Action<int> PageChanged;
 
-        public static Carousel Create(Transform parent, string name)
+        /// <param name="itemsPerView">How many items fit side by side (1 = one page at a time).</param>
+        public static Carousel Create(Transform parent, string name, int itemsPerView = 1)
         {
             var root = Ui.Rect(parent, name);
             var scroll = root.gameObject.AddComponent<ScrollRect>();
@@ -56,6 +61,7 @@ namespace NoClue.UI
             var c = root.gameObject.AddComponent<Carousel>();
             c._scroll = scroll;
             c._content = content;
+            c._perView = Mathf.Max(1, itemsPerView);
             return c;
         }
 
@@ -72,7 +78,7 @@ namespace NoClue.UI
 
         public void GoTo(int page, bool instant = false)
         {
-            page = Mathf.Clamp(page, 0, Mathf.Max(0, _pages.Count - 1));
+            page = Mathf.Clamp(page, 0, MaxPage);
             if (page != Page)
             {
                 Page = page;
@@ -86,11 +92,18 @@ namespace NoClue.UI
             }
         }
 
-        private float Target => _pages.Count <= 1 ? 0 : (float)Page / (_pages.Count - 1);
+        private float Target => MaxPage == 0 ? 0 : (float)Page / MaxPage;
+
+        /// <summary>Scrolls just enough to bring item <paramref name="index"/> into view.</summary>
+        public void Reveal(int index)
+        {
+            if (index < Page) GoTo(index);
+            else if (index >= Page + _perView) GoTo(index - _perView + 1);
+        }
 
         private void SizePages()
         {
-            float w = _scroll.viewport.rect.width;
+            float w = _scroll.viewport.rect.width / _perView;
             foreach (var le in _pages)
                 if (!Mathf.Approximately(le.preferredWidth, w)) le.minWidth = le.preferredWidth = w;
         }
@@ -98,7 +111,7 @@ namespace NoClue.UI
         private void LateUpdate()
         {
             SizePages();   // pages always match the visible width (rotation / resize safe)
-            if (_dragging || _pages.Count <= 1) return;
+            if (_dragging || MaxPage == 0) return;
             float pos = _scroll.horizontalNormalizedPosition;
             float k = 1 - Mathf.Exp(-14f * Time.unscaledDeltaTime);   // smooth glide to the page
             _scroll.horizontalNormalizedPosition = Mathf.Abs(pos - Target) < 0.0005f ? Target : Mathf.Lerp(pos, Target, k);
@@ -111,8 +124,8 @@ namespace NoClue.UI
             _dragging = false;
             float dx = e.position.x - e.pressPosition.x;
             if (Mathf.Abs(dx) > FlickPixels) GoTo(Page + (dx < 0 ? 1 : -1));   // flick: one page
-            else if (_pages.Count > 1)
-                GoTo(Mathf.RoundToInt(_scroll.horizontalNormalizedPosition * (_pages.Count - 1)));
+            else if (MaxPage > 0)
+                GoTo(Mathf.RoundToInt(_scroll.horizontalNormalizedPosition * MaxPage));
         }
 
         public void OnScroll(PointerEventData e)
