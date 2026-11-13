@@ -90,9 +90,6 @@ namespace NoClue.App
             var canvas = canvasGo.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 0.5f;
 
             var bg = Ui.Panel(canvasGo.transform, "Background", Ui.Background);
             Ui.Stretch(bg);
@@ -104,9 +101,13 @@ namespace NoClue.App
                 img.color = new Color(0.55f, 0.5f, 0.5f);       // keep it dark so cards and text pop
                 img.preserveAspect = false;
             }
-            _screenRoot = Ui.Stretch(Ui.Rect(canvasGo.transform, "Screen"));
+            var screenFrame = Ui.Rect(canvasGo.transform, "ScreenFrame");   // sized by PortraitFrame
+            _screenRoot = Ui.Stretch(Ui.Rect(screenFrame, "Screen"));       // shaken by ScreenFx
             ScreenFx.Create(canvasGo.transform, bg, _screenRoot);   // fog behind, vignette/grain/flash in front
             _overlayRoot = Ui.Stretch(Ui.Rect(canvasGo.transform, "Overlay"));   // toasts stay on top
+
+            // portrait phone layout: full width on a phone, a centred phone-shaped column on a PC
+            PortraitFrame.Attach(scaler, screenFrame, _overlayRoot);
         }
 
         private void BuildMusic()
@@ -362,10 +363,14 @@ namespace NoClue.App
             var box = Ui.Panel(_overlayRoot, "Toast", new Color(0.08f, 0.08f, 0.1f, 0.94f));
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0);
             box.pivot = new Vector2(0.5f, 0);
-            box.anchoredPosition = new Vector2(0, 60);
-            box.sizeDelta = new Vector2(1100, 90);
+            box.anchoredPosition = new Vector2(0, 300);   // above the action bar
+            box.sizeDelta = new Vector2(1000, 130);
             var label = Ui.Label(box, text, 28, Ui.TextColor, TextAnchor.MiddleCenter);
-            Ui.Stretch(label.rectTransform, 20, 0, 20, 0);
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 18;
+            label.resizeTextMaxSize = label.fontSize;
+            label.verticalOverflow = VerticalWrapMode.Truncate;
+            Ui.Stretch(label.rectTransform, 24, 8, 24, 8);
             _toast = (box.gameObject, Time.unscaledTime + 4f);
         }
 

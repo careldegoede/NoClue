@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using NoClue.Core;
 using NoClue.Net;
@@ -22,32 +21,32 @@ namespace NoClue.App
 
             var column = Ui.Rect(root, "Column");
             column.anchorMin = column.anchorMax = new Vector2(0.5f, 0.5f);
-            column.sizeDelta = new Vector2(900, 800);
-            Ui.VLayout(column, 26, 0, TextAnchor.MiddleCenter, expandWidth: false);
+            column.sizeDelta = new Vector2(940, 1500);
+            Ui.VLayout(column, 30, 0, TextAnchor.MiddleCenter, expandWidth: false);
 
             var logo = Ui.ThemeSprite("logo");
             if (logo != null)
             {
-                Ui.Size(Ui.Image(column, logo, "Logo").rectTransform, 900, 260);
+                Ui.Size(Ui.Image(column, logo, "Logo").rectTransform, 940, 300);
             }
             else
             {
-                Ui.Size(Ui.Logo(column, 150).rectTransform, 900, 190);
+                Ui.Size(Ui.Logo(column, 170).rectTransform, 940, 230);
             }
-            Ui.Size(Ui.Label(column, "Who did it, where, and with what?", 30, Ui.TextDim, TextAnchor.MiddleCenter,
-                FontStyle.Italic).rectTransform, 700, 60);
-            Ui.Size(Ui.Rect(column, "Gap"), 10, 30);
+            Ui.Size(Ui.Label(column, "Who did it, where, and with what?", 34, Ui.TextDim, TextAnchor.MiddleCenter,
+                FontStyle.Italic).rectTransform, 900, 70);
+            Ui.Size(Ui.Rect(column, "Gap"), 10, 80);
 
-            Ui.Size(Ui.Label(column, "Your name", 26, Ui.TextDim, TextAnchor.LowerLeft).rectTransform, 520, 34);
-            var name = Ui.Input(column, "Enter your name", app.PlayerName);
+            Ui.Size(Ui.Label(column, "Your name", 30, Ui.TextDim, TextAnchor.LowerLeft).rectTransform, 760, 40);
+            var name = Ui.Input(column, "Enter your name", app.PlayerName, 760, 100);
             name.characterLimit = 20;
             name.onEndEdit.AddListener(v => { if (!string.IsNullOrWhiteSpace(v)) app.PlayerName = v.Trim(); });
 
-            Ui.Size(Ui.Rect(column, "Gap"), 10, 10);
-            Ui.Button(column, "HOST", () => { Save(app, name); app.HostGame(); }, width: 520, height: 90, fontSize: 38);
-            Ui.Button(column, "JOIN", () => { Save(app, name); app.ShowBrowse(); }, Ui.PanelLight, width: 520, height: 90, fontSize: 38);
+            Ui.Size(Ui.Rect(column, "Gap"), 10, 30);
+            Ui.Button(column, "HOST", () => { Save(app, name); app.HostGame(); }, width: 760, height: 130, fontSize: 46);
+            Ui.Button(column, "JOIN", () => { Save(app, name); app.ShowBrowse(); }, Ui.PanelLight, width: 760, height: 130, fontSize: 46);
 #if !UNITY_EDITOR
-            Ui.Button(column, "Quit", Application.Quit, Ui.PanelColor, width: 520, height: 70);
+            Ui.Button(column, "Quit", Application.Quit, Ui.PanelColor, width: 760, height: 100);
 #endif
         }
 
@@ -71,7 +70,7 @@ namespace NoClue.App
             var root = Ui.Stretch(Ui.Rect(parent, "Waiting"));
             Root = root.gameObject;
             Ui.Stretch(Ui.Label(root, message, 40, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform);
-            var back = Ui.Button(root, "Cancel", app.ShowMenu, Ui.PanelLight);
+            var back = Ui.Button(root, "Cancel", app.ShowMenu, Ui.PanelLight, width: 600, height: 110);
             var rt = (RectTransform)back.transform;
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.3f);
         }
@@ -99,14 +98,11 @@ namespace NoClue.App
             var root = Ui.Stretch(Ui.Rect(parent, "Browse"));
             Root = root.gameObject;
 
-            var column = Ui.Rect(root, "Column");
-            column.anchorMin = new Vector2(0.5f, 0);
-            column.anchorMax = new Vector2(0.5f, 1);
-            column.sizeDelta = new Vector2(1100, -120);
-            Ui.VLayout(column, 20);
+            var column = Ui.Stretch(Ui.Rect(root, "Column"), 40, 60, 40, 50);
+            Ui.VLayout(column, 22);
 
-            Ui.Size(Ui.Label(column, "Join a game", 64, Ui.Accent, TextAnchor.MiddleLeft, FontStyle.Bold).rectTransform, -1, 90);
-            Ui.Size(Ui.Label(column, "Games hosted on your network:", 28, Ui.TextDim).rectTransform, -1, 40);
+            Ui.Size(Ui.Label(column, "Join a game", 70, Ui.Accent, TextAnchor.MiddleLeft, FontStyle.Bold).rectTransform, -1, 100);
+            Ui.Size(Ui.Label(column, "Games hosted on your network:", 30, Ui.TextDim).rectTransform, -1, 44);
 
             var listBox = Ui.Panel(column, "Games", Ui.PanelColor);
             Ui.Flex(listBox, 1, 1);
@@ -117,11 +113,12 @@ namespace NoClue.App
             _empty = Ui.Label(listBox, "Looking for games...", 30, Ui.TextDim, TextAnchor.MiddleCenter);
             Ui.Stretch(_empty.rectTransform);
 
+            Ui.Size(Ui.Label(column, "Or enter the host's IP:", 30, Ui.TextDim).rectTransform, -1, 44);
             var manual = Ui.Rect(column, "Manual");
-            Ui.Size(manual, -1, 80);
+            Ui.Size(manual, -1, 100);
             Ui.HLayout(manual, 16);
-            Ui.Size(Ui.Label(manual, "Or enter the host's IP:", 28, Ui.TextDim).rectTransform, 300, 76);
-            var ip = Ui.Input(manual, "192.168.1.20", PlayerPrefs.GetString("noclue.lastIp", ""), 420);
+            var ip = Ui.Input(manual, "192.168.1.20", PlayerPrefs.GetString("noclue.lastIp", ""), 400, 100);
+            Ui.Flex(ip, 1);
             Ui.Button(manual, "Join", () =>
             {
                 string text = ip.text.Trim();
@@ -132,9 +129,9 @@ namespace NoClue.App
                 int colon = text.LastIndexOf(':');
                 if (colon > 0 && int.TryParse(text.Substring(colon + 1), out int p)) { port = p; text = text.Substring(0, colon); }
                 _app.JoinGame(text, port, null);
-            }, width: 200, height: 76);
+            }, width: 240, height: 100);
 
-            Ui.Button(column, "Back", app.ShowMenu, Ui.PanelLight, width: 240, height: 70);
+            Ui.Button(column, "Back", app.ShowMenu, Ui.PanelLight, width: -1, height: 110);
 
             try
             {
@@ -164,11 +161,12 @@ namespace NoClue.App
         private void AddRow(GameAdvert g)
         {
             var row = Ui.Panel(_list, "Game " + g.gameId, Ui.PanelLight);
-            Ui.Size(row, -1, 120);
-            Ui.HLayout(row, 20, 12);
+            Ui.Size(row, -1, 150);
+            Ui.HLayout(row, 20, 14);
 
             var portrait = Ui.Image(row, CardCatalog.GetSprite(g.hostCharacterId), "Host");
-            Ui.Size(portrait.rectTransform, 72, 96);
+            Ui.Size(portrait.rectTransform, 90, 120);
+            if (portrait.sprite == null) portrait.color = Ui.PanelColor;   // host still choosing: no white box
 
             string status = g.inProgress ? "in progress" : $"{g.playerCount}/{g.maxPlayers} players";
             var label = Ui.Label(row, $"<b>{g.hostName}'s game</b>\n<size=24><color=#9AA0B0>{status}  ·  {g.address}</color></size>", 32);
@@ -178,7 +176,7 @@ namespace NoClue.App
             bool rejoin = _app.HasTokenFor(g.gameId);
             bool canJoin = rejoin || (!g.inProgress && g.playerCount < g.maxPlayers);
             var btn = Ui.Button(row, rejoin && g.inProgress ? "Rejoin" : "Join",
-                () => _app.JoinGame(g.address, g.tcpPort, g.gameId), width: 200, height: 76);
+                () => _app.JoinGame(g.address, g.tcpPort, g.gameId), width: 220, height: 100);
             btn.interactable = canJoin;
         }
 
@@ -197,6 +195,7 @@ namespace NoClue.App
         private readonly Text _hint;
         private readonly Button _start;
         private readonly Text _waiting;
+        private readonly Text _count;
         private readonly Carousel _carousel;
         private readonly Text _pageLabel;
         private readonly Button _choose;
@@ -211,18 +210,14 @@ namespace NoClue.App
             var root = Ui.Stretch(Ui.Rect(parent, "Lobby"));
             Root = root.gameObject;
 
-            // left: character picker
-            var left = Ui.Rect(root, "Picker");
-            left.anchorMin = new Vector2(0, 0);
-            left.anchorMax = new Vector2(1, 1);
-            left.offsetMin = new Vector2(60, 60);
-            left.offsetMax = new Vector2(-620, -40);
-            Ui.VLayout(left, 16, 0, TextAnchor.UpperLeft);
+            // one portrait column: title, the big character card, then who's here and Start
+            var left = Ui.Stretch(Ui.Rect(root, "Column"), 36, 36, 36, 36);
+            Ui.VLayout(left, 14, 0, TextAnchor.UpperCenter);
 
-            _title = Ui.Label(left, "Lobby", 56, Ui.Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
-            Ui.Size(_title.rectTransform, -1, 80);
-            _hint = Ui.Label(left, "Choose your character", 30, Ui.TextDim);
-            Ui.Size(_hint.rectTransform, -1, 44);
+            _title = Ui.Label(left, "Lobby", 60, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Ui.Size(_title.rectTransform, -1, 84);
+            _hint = Ui.Label(left, "Choose your character", 30, Ui.TextDim, TextAnchor.MiddleCenter);
+            Ui.Size(_hint.rectTransform, -1, 80);
 
             // one big character card at a time: swipe / arrows / mouse wheel (phone friendly)
             var stage = Ui.Rect(left, "Stage");
@@ -256,40 +251,43 @@ namespace NoClue.App
 
             // "3 / 8" + the pick button
             var nav = Ui.Rect(left, "Nav");
-            Ui.Size(nav, -1, 84);
+            Ui.Size(nav, -1, 110);
             Ui.HLayout(nav, 20, 0, TextAnchor.MiddleCenter);
-            _pageLabel = Ui.Label(nav, "", 28, Ui.TextDim, TextAnchor.MiddleCenter);
-            Ui.Size(_pageLabel.rectTransform, 120, 80);
+            _pageLabel = Ui.Label(nav, "", 30, Ui.TextDim, TextAnchor.MiddleCenter);
+            Ui.Size(_pageLabel.rectTransform, 110, 100);
             _choose = Ui.Button(nav, "Choose", () => OnPick(CardCatalog.Characters[_carousel.Page]),
-                width: 520, height: 80, fontSize: 32);
+                width: 760, height: 110, fontSize: 36);
             _carousel.PageChanged += _ => UpdatePicker();
 
-            // right: players + start
-            var right = Ui.Panel(root, "Players", Ui.PanelColor);
-            right.anchorMin = new Vector2(1, 0);
-            right.anchorMax = new Vector2(1, 1);
-            right.pivot = new Vector2(1, 0.5f);
-            right.offsetMin = new Vector2(-560, 60);
-            right.offsetMax = new Vector2(-60, -40);
-            Ui.VLayout(right, 14, 28);
+            // players: two per row so all 8 fit under the card
+            var right = Ui.Panel(left, "Players", Ui.PanelColor);
+            Ui.VLayout(right, 10, 20);
+            Ui.FitHeight(right);
+            var header = Ui.Rect(right, "Header");
+            Ui.Size(header, -1, 50);
+            Ui.HLayout(header, 10);
+            Ui.Flex(Ui.Label(header, "Players", 34, Ui.TextColor, TextAnchor.MiddleLeft, FontStyle.Bold), 1);
+            _count = Ui.Label(header, "", 28, Ui.TextDim, TextAnchor.MiddleRight);
+            Ui.Size(_count.rectTransform, 220, 50);
 
-            Ui.Size(Ui.Label(right, "Players", 40, Ui.TextColor, TextAnchor.MiddleLeft, FontStyle.Bold).rectTransform, -1, 56);
             _players = Ui.Rect(right, "List");
-            Ui.Flex(_players, 1, 1);
-            Ui.VLayout(_players, 10);
+            var grid = Ui.Grid(_players, new Vector2(479, 96), 10);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 2;
+            Ui.FitHeight(_players);
 
             if (app.Session is { IsHost: true })
             {
                 var ips = LocalAddresses();
                 if (ips.Count > 0)
-                    Ui.Size(Ui.Label(right, "Your IP: " + string.Join(", ", ips), 22, Ui.TextDim).rectTransform, -1, 34);
+                    Ui.Size(Ui.Label(right, "Your IP: " + string.Join(", ", ips), 24, Ui.TextDim).rectTransform, -1, 36);
             }
 
-            _start = Ui.Button(right, "Start Game", () => _app.Send(MsgType.StartGame, new StartGameMsg()),
-                width: -1, height: 90, fontSize: 36);
-            _waiting = Ui.Label(right, "Waiting for the host to start...", 26, Ui.TextDim, TextAnchor.MiddleCenter);
-            Ui.Size(_waiting.rectTransform, -1, 50);
-            Ui.Button(right, "Leave", app.Leave, Ui.PanelLight, width: -1, height: 70);
+            _start = Ui.Button(left, "Start Game", () => _app.Send(MsgType.StartGame, new StartGameMsg()),
+                width: -1, height: 120, fontSize: 42);
+            _waiting = Ui.Label(left, "Waiting for the host to start...", 28, Ui.TextDim, TextAnchor.MiddleCenter);
+            Ui.Size(_waiting.rectTransform, -1, 44);
+            Ui.Button(left, "Leave", app.Leave, Ui.PanelLight, width: -1, height: 96);
         }
 
         private void OnPick(string characterId) =>
@@ -355,10 +353,9 @@ namespace NoClue.App
             foreach (var p in view.players)
             {
                 var row = Ui.Panel(_players, p.name, p.id == view.myPlayerId ? Ui.PanelLight : Ui.Background);
-                Ui.Size(row, -1, 92);
-                Ui.HLayout(row, 16, 8);
+                Ui.HLayout(row, 14, 8);
                 var img = Ui.Image(row, CardCatalog.GetSprite(p.characterId), "Portrait");
-                Ui.Size(img.rectTransform, 57, 76);
+                Ui.Size(img.rectTransform, 60, 80);
                 if (img.sprite == null)
                 {
                     // still choosing: a dark placeholder card with a "?" instead of a blank white box
@@ -368,11 +365,15 @@ namespace NoClue.App
                 string tag = p.isHost ? "  <color=#C9A04A>(host)</color>" : "";
                 string choosing = string.IsNullOrEmpty(p.characterId) ? "\n<size=22><color=#9AA0B0>choosing...</color></size>"
                     : $"\n<size=22><color=#9AA0B0>{CardCatalog.DisplayName(p.characterId)}</color></size>";
-                var label = Ui.Label(row, p.name + tag + choosing, 30);
+                var label = Ui.Label(row, p.name + tag + choosing, 28);
                 label.supportRichText = true;
-                Ui.Flex(label, 1);
+                label.resizeTextForBestFit = true;   // long names shrink to fit the half-width chip
+                label.resizeTextMinSize = 16;
+                label.resizeTextMaxSize = label.fontSize;
+                label.verticalOverflow = VerticalWrapMode.Truncate;
+                Ui.Flex(label, 1, 1);
             }
-            Ui.Size(Ui.Label(_players, $"{view.players.Length}/{CardCatalog.MaxPlayers} players", 24, Ui.TextDim).rectTransform, -1, 36);
+            _count.text = $"{view.players.Length}/{CardCatalog.MaxPlayers}";
 
             bool isHost = me is { isHost: true };
             bool canStart = view.players.Length >= 2 && view.players.All(p => !string.IsNullOrEmpty(p.characterId));
@@ -386,18 +387,13 @@ namespace NoClue.App
 
         private static List<string> LocalAddresses()
         {
-            var result = new List<string>();
-            try
-            {
-                foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (nic.OperationalStatus != OperationalStatus.Up || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                    foreach (var ua in nic.GetIPProperties().UnicastAddresses)
-                        if (ua.Address.AddressFamily == AddressFamily.InterNetwork) result.Add(ua.Address.ToString());
-                }
-            }
-            catch (NetworkInformationException) { }
-            return result;
+            // only home-network addresses (192.168.x.x, 10.x.x.x, 172.16-31.x.x): not mobile data or VPNs
+            return LanDiscovery.LocalSubnets()
+                .Select(s => s.ip.GetAddressBytes())
+                .Where(b => b[0] == 192 && b[1] == 168 || b[0] == 10 || b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+                .Select(b => string.Join(".", b))
+                .Distinct()
+                .ToList();
         }
 
         public void Tick() { }

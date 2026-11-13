@@ -27,16 +27,16 @@ namespace NoClue.EditorTools
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26; // Android 8.0+
             PlayerSettings.Android.forceInternetPermission = true;                     // TCP/UDP on the LAN
 
-            // landscape only, either way round
-            PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
-            PlayerSettings.allowedAutorotateToLandscapeLeft = true;
-            PlayerSettings.allowedAutorotateToLandscapeRight = true;
-            PlayerSettings.allowedAutorotateToPortrait = false;
+            // portrait only: held in one hand like any phone game
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+            PlayerSettings.allowedAutorotateToPortrait = true;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+            PlayerSettings.allowedAutorotateToLandscapeLeft = false;
+            PlayerSettings.allowedAutorotateToLandscapeRight = false;
 
             PlayerSettings.runInBackground = true;
             AssetDatabase.SaveAssets();
-            Debug.Log($"[NoClue] Android settings applied ({PackageId}, IL2CPP, ARM64, API 26+, landscape).");
+            Debug.Log($"[NoClue] Android settings applied ({PackageId}, IL2CPP, ARM64, API 26+, portrait).");
         }
 
         [MenuItem("NoClue/Android/Build APK")]

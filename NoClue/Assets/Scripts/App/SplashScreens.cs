@@ -54,7 +54,7 @@ namespace NoClue.App
             {
                 Ui.Size(Ui.Logo(titleBox, 170).rectTransform, -1, 200);
             }
-            Ui.Size(Ui.Label(titleBox, "Click anywhere to enter", 26, Ui.TextDim, TextAnchor.MiddleCenter,
+            Ui.Size(Ui.Label(titleBox, "Tap anywhere to enter", 26, Ui.TextDim, TextAnchor.MiddleCenter,
                 FontStyle.Italic).rectTransform, -1, 40);
 
             // the whole splash is one big "continue" button

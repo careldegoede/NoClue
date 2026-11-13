@@ -38,10 +38,21 @@ namespace NoClue.Core
 
         public static CardType TypeOf(string id) => s_Types[id];
 
+        // names that should read like the card art rather than the id
+        private static readonly Dictionary<string, string> s_Names = new()
+        {
+            { "AntieLana", "Auntie Lana" },
+            { "GrandMa", "Grandma" },
+            { "GrandPa", "Grandpa" },
+            { "Braai", "Braai Area" },
+            { "CellCharger", "Cell Phone Charger" },
+        };
+
         /// <summary>"SwimmingPool" -> "Swimming Pool", "TVRoom" -> "TV Room".</summary>
         public static string DisplayName(string id)
         {
             if (string.IsNullOrEmpty(id)) return "";
+            if (s_Names.TryGetValue(id, out var name)) return name;
             var sb = new System.Text.StringBuilder(id.Length + 4);
             for (int i = 0; i < id.Length; i++)
             {

@@ -18,6 +18,12 @@ namespace NoClue.App
     {
         private const float CardAspect = 0.7f;   // card images range from 2:3 to 3:4
 
+        // portrait layout (1080 wide): players on top, banner, card rows, action bar at the bottom
+        private const float StripHeight = 172f;
+        private const float BannerHeight = 140f;
+        private const float BarHeight = 290f;
+        private const float ArrowWidth = 58f;
+
         private readonly NoClueApp _app;
         private readonly Transform _root;
         private readonly RectTransform _playerStrip;
@@ -90,42 +96,57 @@ namespace NoClue.App
             _playerStrip.anchorMin = new Vector2(0, 1);
             _playerStrip.anchorMax = new Vector2(1, 1);
             _playerStrip.pivot = new Vector2(0.5f, 1);
-            _playerStrip.offsetMin = new Vector2(0, -190);
+            _playerStrip.offsetMin = new Vector2(0, -StripHeight);
             _playerStrip.offsetMax = Vector2.zero;
-            Ui.HLayout(_playerStrip, 14, 12, TextAnchor.MiddleCenter);
+            Ui.HLayout(_playerStrip, 4, 8, TextAnchor.MiddleCenter);
 
-            // ---- banner
+            // ---- banner (wraps onto two lines on a phone)
             _banner = Ui.Panel(root, "Banner", Ui.Background);
             _banner.anchorMin = new Vector2(0, 1);
             _banner.anchorMax = new Vector2(1, 1);
             _banner.pivot = new Vector2(0.5f, 1);
-            _banner.offsetMin = new Vector2(20, -290);
-            _banner.offsetMax = new Vector2(-20, -196);
+            _banner.offsetMin = new Vector2(16, -StripHeight - 6 - BannerHeight);
+            _banner.offsetMax = new Vector2(-16, -StripHeight - 6);
             Ui.HLayout(_banner, 14, 6, TextAnchor.MiddleCenter);
 
-            // ---- bottom: action bar
+            // ---- bottom: action bar. Picks, then the two big turn buttons, then the small ones.
             var bar = Ui.Panel(root, "ActionBar", Ui.PanelColor);
             bar.anchorMin = new Vector2(0, 0);
             bar.anchorMax = new Vector2(1, 0);
             bar.pivot = new Vector2(0.5f, 0);
             bar.offsetMin = new Vector2(0, 0);
-            bar.offsetMax = new Vector2(0, 124);
-            Ui.HLayout(bar, 16, 16, TextAnchor.MiddleCenter);
-            _picksLabel = Ui.Label(bar, "", 26, Ui.TextColor, TextAnchor.MiddleLeft);
+            bar.offsetMax = new Vector2(0, BarHeight);
+            Ui.VLayout(bar, 10, 12);
+            _picksLabel = Ui.Label(bar, "", 28, Ui.TextColor, TextAnchor.MiddleCenter);
             _picksLabel.supportRichText = true;
-            Ui.Flex(_picksLabel, 1);
-            _spin = Ui.Button(bar, "Spin the die!", () => Send(MsgType.Roll), width: 330, height: 92, fontSize: 32);
-            _accuse = Ui.Button(bar, "Accuse", ShowAccuseConfirm, Ui.Danger, width: 250, height: 92, fontSize: 32);
-            Ui.Button(bar, "My Cards", OpenCardsOverlay, Ui.Blue, width: 230, height: 92, fontSize: 28);
-            Ui.Button(bar, "Log", ToggleLog, Ui.PanelLight, width: 150, height: 92, fontSize: 28);
-            Ui.Button(bar, "Leave", app.Leave, Ui.PanelLight, width: 170, height: 92, fontSize: 28);
+            _picksLabel.resizeTextForBestFit = true;
+            _picksLabel.resizeTextMinSize = 18;
+            _picksLabel.resizeTextMaxSize = _picksLabel.fontSize;
+            Ui.Size(_picksLabel.rectTransform, -1, 50);
+
+            var turnRow = Ui.Rect(bar, "TurnButtons");
+            Ui.Size(turnRow, -1, 110);
+            var turnLayout = Ui.HLayout(turnRow, 12, 0, TextAnchor.MiddleCenter);
+            turnLayout.childForceExpandWidth = true;
+            _spin = Ui.Button(turnRow, "Spin the die!", () => Send(MsgType.Roll), width: 300, height: 110, fontSize: 40);
+            Ui.Flex(_spin, 1);
+            _accuse = Ui.Button(turnRow, "Accuse", ShowAccuseConfirm, Ui.Danger, width: 300, height: 110, fontSize: 40);
+            Ui.Flex(_accuse, 1);
+
+            var moreRow = Ui.Rect(bar, "MoreButtons");
+            Ui.Size(moreRow, -1, 84);
+            var moreLayout = Ui.HLayout(moreRow, 12, 0, TextAnchor.MiddleCenter);
+            moreLayout.childForceExpandWidth = true;
+            Ui.Flex(Ui.Button(moreRow, "My Cards", OpenCardsOverlay, Ui.Blue, width: 200, height: 84, fontSize: 30), 2);
+            Ui.Flex(Ui.Button(moreRow, "Log", ToggleLog, Ui.PanelLight, width: 120, height: 84, fontSize: 30), 1);
+            Ui.Flex(Ui.Button(moreRow, "Leave", app.Leave, Ui.PanelLight, width: 120, height: 84, fontSize: 30), 1);
 
             // ---- middle: three swipeable card rows, 3 cards in view each
             var rows = Ui.Rect(root, "Rows");
             rows.anchorMin = Vector2.zero;
             rows.anchorMax = Vector2.one;
-            rows.offsetMin = new Vector2(12, 132);
-            rows.offsetMax = new Vector2(-12, -296);
+            rows.offsetMin = new Vector2(8, BarHeight + 8);
+            rows.offsetMax = new Vector2(-8, -StripHeight - 6 - BannerHeight - 6);
             var v = Ui.VLayout(rows, 6);
             v.childForceExpandHeight = true;
             BuildRow(rows, "Characters", CardType.Character);
@@ -138,11 +159,11 @@ namespace NoClue.App
             var row = Ui.Rect(parent, title);
             Ui.Flex(row, 1, 1);
             Ui.VLayout(row, 0, 0, TextAnchor.UpperCenter);
-            Ui.Size(Ui.Label(row, title, 24, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 30);
+            Ui.Size(Ui.Label(row, title, 26, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 32);
 
             var strip = Ui.Rect(row, "Strip");
             Ui.Flex(strip, 1, 1);
-            Ui.HLayout(strip, 10, 0, TextAnchor.MiddleCenter);
+            Ui.HLayout(strip, 6, 0, TextAnchor.MiddleCenter);
 
             var holder = Ui.Rect(strip, "Cards");
             var holderLe = holder.gameObject.AddComponent<LayoutElement>();
@@ -150,21 +171,22 @@ namespace NoClue.App
             var fit = holder.gameObject.AddComponent<FitWidthToHeight>();
             fit.Aspect = CardAspect;
             fit.Items = 3;
-            fit.Reserved = 2 * 76 + 2 * 10;
+            fit.ItemPadding = 8;
+            fit.Reserved = 2 * ArrowWidth + 2 * 6;
 
             var carousel = Carousel.Create(holder, title, itemsPerView: 3);
             Ui.Stretch((RectTransform)carousel.transform);
             _rows[type] = carousel;
 
             // arrows either side (siblings in the strip; created after so they sit left/right)
-            var left = Ui.Button(strip, "«", carousel.Previous, new Color(0, 0, 0, 0.55f), 40, 76, 110);
+            var left = Ui.Button(strip, "«", carousel.Previous, new Color(0, 0, 0, 0.55f), 40, ArrowWidth, 130);
             left.transform.SetAsFirstSibling();
-            Ui.Button(strip, "»", carousel.Next, new Color(0, 0, 0, 0.55f), 40, 76, 110);
+            Ui.Button(strip, "»", carousel.Next, new Color(0, 0, 0, 0.55f), 40, ArrowWidth, 130);
 
             foreach (var id in CardCatalog.OfType(type))
             {
                 var page = carousel.AddPage(id);
-                var inner = Ui.Stretch(Ui.Rect(page, "Slot"), 6, 4, 6, 4);
+                var inner = Ui.Stretch(Ui.Rect(page, "Slot"), 4, 3, 4, 3);
                 var card = new CardWidget(inner, id, OnCardClicked, ToggleSuspect);
                 var aspect = card.Root.gameObject.AddComponent<AspectRatioFitter>();
                 aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
@@ -216,29 +238,35 @@ namespace NoClue.App
         {
             Ui.Clear(_playerStrip);
             string arrow = _view.direction >= 0 ? "»" : "«";   // play direction between the chips
+            // up to 8 players across a 1080-wide phone: chips shrink to fit
+            const float arrowW = 20f, gap = 4f;
+            int n = Mathf.Max(1, _view.players.Length);
+            float width = ((RectTransform)_root).rect.width;
+            if (width <= 0) width = PortraitFrame.RefWidth;
+            float chipW = Mathf.Clamp((width - 16 - (n - 1) * (arrowW + 2 * gap)) / n, 90f, 170f);
             bool first = true;
             foreach (var p in _view.players)
             {
                 if (!first)
                 {
-                    var a = Ui.Label(_playerStrip, arrow, 44, _view.direction >= 0 ? Ui.TextDim : Ui.Danger,
+                    var a = Ui.Label(_playerStrip, arrow, 34, _view.direction >= 0 ? Ui.TextDim : Ui.Danger,
                         TextAnchor.MiddleCenter, FontStyle.Bold);
-                    Ui.Size(a.rectTransform, 28, 166);
+                    Ui.Size(a.rectTransform, arrowW, 150);
                 }
                 first = false;
 
                 bool active = p.id == _view.activePlayerId;
                 bool asked = _view.ask.active && p.id == _view.ask.responderId;
                 var chip = Ui.Panel(_playerStrip, p.name, active ? Ui.Accent : asked ? Ui.Blue : Ui.PanelLight);
-                Ui.Size(chip, 170, 166);
+                Ui.Size(chip, chipW, 156);
 
                 var img = Ui.Image(chip, CardCatalog.GetSprite(p.characterId), "Portrait");
                 var irt = img.rectTransform;
                 irt.anchorMin = new Vector2(0.5f, 1);
                 irt.anchorMax = new Vector2(0.5f, 1);
                 irt.pivot = new Vector2(0.5f, 1);
-                irt.anchoredPosition = new Vector2(0, -6);
-                irt.sizeDelta = new Vector2(66, 88);
+                irt.anchoredPosition = new Vector2(0, -5);
+                irt.sizeDelta = new Vector2(63, 84);
                 if (!p.connected || p.eliminated || p.ejected) img.color = new Color(0.4f, 0.4f, 0.4f);
 
                 // host: tap a dropped player's chip to bring back the wait / eject choice
@@ -261,7 +289,7 @@ namespace NoClue.App
                 label.resizeTextMaxSize = 19;
                 label.verticalOverflow = VerticalWrapMode.Truncate;
                 label.horizontalOverflow = HorizontalWrapMode.Wrap;
-                Ui.Stretch(label.rectTransform, 6, 98, 6, 4);
+                Ui.Stretch(label.rectTransform, 4, 92, 4, 3);
             }
         }
 
@@ -311,12 +339,11 @@ namespace NoClue.App
                 var asker = Player(ask.askerId);
                 var responder = Player(ask.responderId);
                 BannerPortrait(asker);
-                BannerText($"{Name(asker)} asked", Ui.TextColor);
-                BannerPortrait(responder);
                 string waiting = responder is { connected: false } ? "  (offline, waiting...)" : "";
-                BannerText($"{Name(responder)}:  {CardCatalog.DisplayName(ask.characterId)}, in the " +
+                BannerText($"{Name(asker)} asked {Name(responder)}:\n{CardCatalog.DisplayName(ask.characterId)}, in the " +
                            $"{CardCatalog.DisplayName(ask.roomId)}, with the {CardCatalog.DisplayName(ask.weaponId)}{waiting}",
                     Ui.TextColor);
+                BannerPortrait(responder);
                 return;
             }
 
@@ -367,15 +394,18 @@ namespace NoClue.App
         private void BannerPortrait(PlayerView p)
         {
             var img = Ui.Image(_banner, CardCatalog.GetSprite(p?.characterId), "Portrait");
-            Ui.Size(img.rectTransform, 60, 80);
+            Ui.Size(img.rectTransform, 84, 112);
         }
 
         private Text BannerText(string text, Color color)
         {
-            var t = Ui.Label(_banner, text, 30, color, TextAnchor.MiddleLeft, FontStyle.Bold);
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            var fitter = t.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            // wraps and shrinks to fit the phone's width (up to 3 lines)
+            var t = Ui.Label(_banner, text, 30, color, TextAnchor.MiddleCenter, FontStyle.Bold);
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = 18;
+            t.resizeTextMaxSize = t.fontSize;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
+            Ui.Flex(t, 1, 1);
             var shadow = t.gameObject.AddComponent<Shadow>();
             shadow.effectColor = new Color(0, 0, 0, 0.8f);
             shadow.effectDistance = new Vector2(2, -2);
@@ -427,26 +457,29 @@ namespace NoClue.App
             Ui.Stretch(dim);
             _cardsOverlay = dim.gameObject;
             var box = Ui.Panel(dim, "Box", Ui.PanelColor);
-            Ui.Stretch(box, 30, 24, 30, 24);
+            Ui.Stretch(box, 16, 16, 16, 16);
             Ui.StyleFrame(box);
             box.gameObject.AddComponent<PopIn>();
-            Ui.VLayout(box, 10, 20, TextAnchor.UpperCenter);
+            Ui.VLayout(box, 10, 18, TextAnchor.UpperCenter);
 
-            // header: title, filter toggle, current picks
+            // header: title + filter toggle, then the current picks on their own line
             var header = Ui.Rect(box, "Header");
-            Ui.Size(header, -1, 70);
+            Ui.Size(header, -1, 80);
             Ui.HLayout(header, 16, 0, TextAnchor.MiddleLeft);
-            Ui.Size(Ui.Label(header, "My Cards", 44, Ui.Accent, TextAnchor.MiddleLeft, FontStyle.Bold).rectTransform, 330, 66);
-            var filter = Ui.Button(header, _ownedOnly ? "Show all" : "Owned only", null, Ui.PanelLight, 24, 220, 60);
+            Ui.Flex(Ui.Label(header, "My Cards", 50, Ui.Accent, TextAnchor.MiddleLeft, FontStyle.Bold), 1);
+            var filter = Ui.Button(header, _ownedOnly ? "Show all" : "Owned only", null, Ui.PanelLight, 28, 280, 76);
             filter.onClick.AddListener(() =>
             {
                 _ownedOnly = !_ownedOnly;
                 Ui.SetButtonLabel(filter, _ownedOnly ? "Show all" : "Owned only");
                 RefreshCardsOverlay();
             });
-            _overlayPicks = Ui.Label(header, "", 26, Ui.TextColor, TextAnchor.MiddleRight);
+            _overlayPicks = Ui.Label(box, "", 28, Ui.TextColor, TextAnchor.MiddleCenter);
             _overlayPicks.supportRichText = true;
-            Ui.Flex(_overlayPicks, 1);
+            _overlayPicks.resizeTextForBestFit = true;
+            _overlayPicks.resizeTextMinSize = 18;
+            _overlayPicks.resizeTextMaxSize = _overlayPicks.fontSize;
+            Ui.Size(_overlayPicks.rectTransform, -1, 50);
 
             // all cards, three sections, scrollable
             var area = Ui.Rect(box, "Area");
@@ -460,7 +493,7 @@ namespace NoClue.App
                 Ui.Size(Ui.Label(content, title, 28, Ui.Accent, TextAnchor.LowerCenter, FontStyle.Bold).rectTransform, -1, 40);
                 var grid = Ui.Rect(content, title);
                 // 3 big cards per row, scroll up/down: same feel on a phone as on the PC
-                var g = Ui.Grid(grid, new Vector2(270, 386), 18, TextAnchor.UpperCenter);
+                var g = Ui.Grid(grid, new Vector2(300, 428), 16, TextAnchor.UpperCenter);
                 g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
                 g.constraintCount = 3;
                 Ui.FitHeight(grid);
@@ -470,9 +503,9 @@ namespace NoClue.App
 
             // footer
             var footer = Ui.Rect(box, "Footer");
-            Ui.Size(footer, -1, 86);
+            Ui.Size(footer, -1, 110);
             Ui.HLayout(footer, 20, 0, TextAnchor.MiddleCenter);
-            Ui.Button(footer, "Cancel", CloseCardsOverlay, Ui.PanelLight, width: 280, height: 80);
+            Ui.Button(footer, "Cancel", CloseCardsOverlay, Ui.PanelLight, width: 400, height: 106);
             _overlayOk = Ui.Button(footer, "OK", () =>
             {
                 if (IsMyTurnAndFree())
@@ -483,7 +516,7 @@ namespace NoClue.App
                 }
                 CloseCardsOverlay();
                 Redraw();
-            }, width: 280, height: 80);
+            }, width: 400, height: 106);
 
             RefreshCardsOverlay();
         }
@@ -584,7 +617,7 @@ namespace NoClue.App
                 return;
             }
 
-            var box = Ui.Modal(_root, "Log", 1000, 820, out _logModal);
+            var box = Ui.Modal(_root, "Log", 1000, 1400, out _logModal);
             Ui.VLayout(box, 12, 28, TextAnchor.UpperCenter);
             Ui.Size(Ui.Label(box, "What happened", 40, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 56);
             var area = Ui.Panel(box, "Area", Ui.Background);
@@ -593,8 +626,8 @@ namespace NoClue.App
             Ui.Stretch((RectTransform)content.parent.parent, 16, 12, 16, 12);
             Ui.VLayout(content, 0);
             Ui.FitHeight(content);
-            _logText = Ui.Label(content, "", 24, Ui.TextColor, TextAnchor.UpperLeft);
-            Ui.Button(box, "Close", ToggleLog, Ui.PanelLight, width: 260, height: 76);
+            _logText = Ui.Label(content, "", 28, Ui.TextColor, TextAnchor.UpperLeft);
+            Ui.Button(box, "Close", ToggleLog, Ui.PanelLight, width: 400, height: 100);
             RefreshLog();
         }
 
@@ -629,20 +662,20 @@ namespace NoClue.App
 
             _hostModalFor = dropped.id;
             int id = dropped.id;
-            var box = Ui.Modal(_root, "Disconnected", 860, 560, out _hostModal);
+            var box = Ui.Modal(_root, "Disconnected", 980, 720, out _hostModal);
             Ui.VLayout(box, 16, 30, TextAnchor.UpperCenter);
             Ui.Size(Ui.Label(box, $"{dropped.name} disconnected", 44, Ui.Danger, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 60);
             var portrait = Ui.Image(box, CardCatalog.GetSprite(dropped.characterId), "Portrait");
             portrait.color = new Color(0.5f, 0.5f, 0.5f);
-            Ui.Size(portrait.rectTransform, -1, 190);
+            Ui.Size(portrait.rectTransform, -1, 260);
             Ui.Size(Ui.Label(box, "Wait for them to rejoin, or remove them. If you remove them, their cards are shown to everyone.",
                 24, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, -1, 70);
             var buttons = Ui.Rect(box, "Buttons");
-            Ui.Size(buttons, -1, 84);
+            Ui.Size(buttons, -1, 104);
             Ui.HLayout(buttons, 20, 0, TextAnchor.MiddleCenter);
-            Ui.Button(buttons, "Wait", () => { _waitingOn.Add(id); RefreshHostPrompt(); }, Ui.PanelLight, width: 300, height: 80);
+            Ui.Button(buttons, "Wait", () => { _waitingOn.Add(id); RefreshHostPrompt(); }, Ui.PanelLight, width: 420, height: 100);
             Ui.Button(buttons, "Eject", () => _app.Send(MsgType.EjectPlayer, new EjectPlayerMsg { playerId = id }),
-                Ui.Danger, width: 300, height: 80);
+                Ui.Danger, width: 420, height: 100);
         }
 
         // ------------------------------------------------------------------ pop-ups
@@ -661,28 +694,28 @@ namespace NoClue.App
             if (!mustAnswer) return;
 
             var asker = Player(ask.askerId);
-            var box = Ui.Modal(_root, "Answer", 900, 640, out _answerModal);
+            var held = new[] { ask.characterId, ask.roomId, ask.weaponId }.Where(_view.hand.Contains).ToList();
+            var box = Ui.Modal(_root, "Answer", 980, held.Count == 0 ? 830 : 700, out _answerModal);
             Ui.VLayout(box, 18, 30, TextAnchor.UpperCenter);
 
-            var held = new[] { ask.characterId, ask.roomId, ask.weaponId }.Where(_view.hand.Contains).ToList();
             Ui.Size(Ui.Label(box, $"{Name(asker)} asks you:", 40, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 56);
             Ui.Size(Ui.Label(box, held.Count > 0 ? "Choose ONE card to show (only they will see it)." : "You don't have any of these.",
                 26, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, -1, 40);
 
             var row = Ui.Rect(box, "Cards");
-            Ui.Size(row, -1, 300);
-            Ui.HLayout(row, 24, 0, TextAnchor.MiddleCenter);
+            Ui.Size(row, -1, 400);
+            Ui.HLayout(row, 20, 0, TextAnchor.MiddleCenter);
             foreach (var id in new[] { ask.characterId, ask.roomId, ask.weaponId })
             {
                 bool canShow = held.Contains(id);
                 var card = new CardWidget(row, id, canShow ? ShowCard : null);
-                Ui.Size(card.Root, 210, 280);
+                Ui.Size(card.Root, 280, 380);
                 card.SetDimmed(!canShow);
                 card.SetSelected(canShow);
             }
 
             if (held.Count == 0)
-                Ui.Button(box, "I have none", () => ShowCard(""), Ui.PanelLight, width: 400, height: 80);
+                Ui.Button(box, "I have none", () => ShowCard(""), Ui.PanelLight, width: 500, height: 100);
         }
 
         private void ShowCard(string cardId)
@@ -707,17 +740,17 @@ namespace NoClue.App
             if (_shownModal != null) return;
 
             var by = Player(_view.lastShownById);
-            var box = Ui.Modal(_root, "Shown", 640, 640, out _shownModal);
+            var box = Ui.Modal(_root, "Shown", 800, 830, out _shownModal);
             Ui.VLayout(box, 18, 30, TextAnchor.UpperCenter, expandWidth: false);
-            Ui.Size(Ui.Label(box, $"{Name(by)} showed you:", 38, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, 560, 56);
+            Ui.Size(Ui.Label(box, $"{Name(by)} showed you:", 40, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, 720, 60);
             var card = new CardWidget(box, _view.lastShownCardId);
-            Ui.Size(card.Root, 270, 360);
+            Ui.Size(card.Root, 400, 560);
             Ui.Button(box, "OK", () =>
             {
                 _app.Send(MsgType.AckShown, new AckShownMsg());
                 if (_shownModal != null) Object.Destroy(_shownModal);
                 _shownModal = null;
-            }, width: 260, height: 70);
+            }, width: 400, height: 100);
         }
 
         /// <summary>My question went all the way round and nobody could show a card. The turn waits for my OK.</summary>
@@ -734,19 +767,19 @@ namespace NoClue.App
             }
             if (_nobodyModal != null) return;
 
-            var box = Ui.Modal(_root, "Nobody", 900, 680, out _nobodyModal);
+            var box = Ui.Modal(_root, "Nobody", 980, 790, out _nobodyModal);
             Ui.VLayout(box, 16, 30, TextAnchor.UpperCenter);
             Ui.Size(Ui.Label(box, "Nobody could show you a card!", 44, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 60);
             Ui.Size(Ui.Label(box, "No other player has any of these. Each one is in the envelope... or in your own hand.",
                 26, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, -1, 70);
 
             var row = Ui.Rect(box, "Cards");
-            Ui.Size(row, -1, 300);
-            Ui.HLayout(row, 24, 0, TextAnchor.MiddleCenter);
+            Ui.Size(row, -1, 400);
+            Ui.HLayout(row, 20, 0, TextAnchor.MiddleCenter);
             foreach (var id in new[] { q.characterId, q.roomId, q.weaponId })
             {
                 var card = new CardWidget(row, id);
-                Ui.Size(card.Root, 210, 280);
+                Ui.Size(card.Root, 280, 380);
                 bool mineCard = _view.hand.Contains(id);
                 card.SetDimmed(mineCard);          // my own cards are no mystery
                 card.SetSelected(!mineCard);       // the rest could be the answer
@@ -757,7 +790,7 @@ namespace NoClue.App
                 _app.Send(MsgType.AckShown, new AckShownMsg());
                 if (_nobodyModal != null) Object.Destroy(_nobodyModal);
                 _nobodyModal = null;
-            }, width: 260, height: 70);
+            }, width: 400, height: 100);
         }
 
         // ------------------------------------------------------------------ the die and "Show all"
@@ -820,19 +853,19 @@ namespace NoClue.App
             _revealChoiceModal = null;
             if (!mine) return;
 
-            var box = Ui.Modal(_root, "RevealChoice", 900, 620, out _revealChoiceModal);
+            var box = Ui.Modal(_root, "RevealChoice", 980, 690, out _revealChoiceModal);
             Ui.VLayout(box, 18, 30, TextAnchor.UpperCenter);
             Ui.Size(Ui.Label(box, "SHOW ALL!", 48, Ui.Blue, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 64);
             Ui.Size(Ui.Label(box, "Pick one card. If another player has it, everyone gets to see it.",
                 26, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, -1, 40);
 
             var row = Ui.Rect(box, "Cards");
-            Ui.Size(row, -1, 300);
-            Ui.HLayout(row, 24, 0, TextAnchor.MiddleCenter);
+            Ui.Size(row, -1, 400);
+            Ui.HLayout(row, 20, 0, TextAnchor.MiddleCenter);
             foreach (var id in new[] { rc.characterId, rc.roomId, rc.weaponId })
             {
                 var card = new CardWidget(row, id, ChooseReveal);
-                Ui.Size(card.Root, 210, 280);
+                Ui.Size(card.Root, 280, 380);
                 card.SetSelected(true);
             }
         }
@@ -868,26 +901,26 @@ namespace NoClue.App
                 ? $"Nobody else has {card}!"
                 : holder.id == _view.myPlayerId ? $"Your {card} card is revealed!" : $"{holder.name} has {card}!";
 
-            var box = Ui.Modal(_root, "PublicReveal", 760, 720, out _publicRevealModal);
+            var box = Ui.Modal(_root, "PublicReveal", 980, 900, out _publicRevealModal);
             Ui.VLayout(box, 16, 28, TextAnchor.UpperCenter, expandWidth: false);
-            Ui.Size(Ui.Label(box, $"{Name(asker)} rolled SHOW ALL", 26, Ui.Blue, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, 700, 36);
-            Ui.Size(Ui.Label(box, title, 40, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, 700, 56);
+            Ui.Size(Ui.Label(box, $"{Name(asker)} rolled SHOW ALL", 26, Ui.Blue, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, 920, 40);
+            Ui.Size(Ui.Label(box, title, 40, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, 920, 60);
 
             var row = Ui.Rect(box, "Row");
-            Ui.Size(row, 700, 380);
-            Ui.HLayout(row, 24, 0, TextAnchor.MiddleCenter);
-            Ui.Size(new CardWidget(row, _view.publicRevealCardId).Root, 270, 360);
+            Ui.Size(row, 920, 450);
+            Ui.HLayout(row, 20, 0, TextAnchor.MiddleCenter);
+            Ui.Size(new CardWidget(row, _view.publicRevealCardId).Root, 310, 430);
             if (holder != null)
             {
                 var portrait = Ui.Image(row, CardCatalog.GetSprite(holder.characterId), "Holder");
-                Ui.Size(portrait.rectTransform, 150, 200);
+                Ui.Size(portrait.rectTransform, 210, 280);
             }
             else
             {
                 var hint = Ui.Label(row, "It's either in the envelope,\nor in " +
                                          (asker != null && asker.id == _view.myPlayerId ? "your" : $"{Name(asker)}'s") + " own hand.",
                     24, Ui.TextDim, TextAnchor.MiddleCenter);
-                Ui.Size(hint.rectTransform, 300, 200);
+                Ui.Size(hint.rectTransform, 400, 280);
             }
 
             var modal = _publicRevealModal;
@@ -895,7 +928,7 @@ namespace NoClue.App
             {
                 if (iMustAck) _app.Send(MsgType.AckShown, new AckShownMsg());
                 Object.Destroy(modal);
-            }, width: 260, height: 70);
+            }, width: 400, height: 100);
         }
 
         private void RefreshGameOver()
@@ -904,7 +937,7 @@ namespace NoClue.App
 
             // Drumroll: "And the winner is..." plays while the title teases, then Tick() reveals the rest.
             var winner = Player(_view.winnerId);
-            var box = Ui.Modal(_root, "GameOver", 1100, 860, out _gameOverModal);
+            var box = Ui.Modal(_root, "GameOver", 1000, 1300, out _gameOverModal);
             Ui.VLayout(box, 16, 30, TextAnchor.UpperCenter);
             _gameOverTitle = Ui.Label(box, "And the winner is...", 56, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
             Ui.Size(_gameOverTitle.rectTransform, -1, 80);
@@ -918,25 +951,25 @@ namespace NoClue.App
             if (winner != null)
             {
                 var portrait = Ui.Image(_gameOverContent, CardCatalog.GetSprite(winner.characterId), "Winner");
-                Ui.Size(portrait.rectTransform, -1, 190);
+                Ui.Size(portrait.rectTransform, -1, 260);
             }
             Ui.Size(Ui.Label(_gameOverContent, "It was...", 28, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, -1, 40);
 
             var row = Ui.Rect(_gameOverContent, "Solution");
-            Ui.Size(row, -1, 290);
-            Ui.HLayout(row, 24, 0, TextAnchor.MiddleCenter);
+            Ui.Size(row, -1, 400);
+            Ui.HLayout(row, 20, 0, TextAnchor.MiddleCenter);
             foreach (var id in _view.solution)
-                Ui.Size(new CardWidget(row, id).Root, 210, 280);
+                Ui.Size(new CardWidget(row, id).Root, 280, 380);
 
             var buttons = Ui.Rect(_gameOverContent, "Buttons");
-            Ui.Size(buttons, -1, 80);
+            Ui.Size(buttons, -1, 104);
             Ui.HLayout(buttons, 20, 0, TextAnchor.MiddleCenter);
             Ui.Button(buttons, "Look at the table", () =>
             {
                 _gameOverDismissed = true;
                 Object.Destroy(_gameOverModal);
-            }, Ui.PanelLight, width: 340);
-            Ui.Button(buttons, "Back to menu", _app.Leave, width: 340);
+            }, Ui.PanelLight, width: 440, height: 100);
+            Ui.Button(buttons, "Back to menu", _app.Leave, width: 440, height: 100);
 
             _gameOverContent.gameObject.SetActive(false);
             _app.PlaySfx("and-the-winner-is-deep-voice");
@@ -973,24 +1006,24 @@ namespace NoClue.App
             if (_picked.Count != 3) return;
             if (_accuseModal != null) Object.Destroy(_accuseModal);
 
-            var box = Ui.Modal(_root, "Accuse", 1000, 640, out _accuseModal);
+            var box = Ui.Modal(_root, "Accuse", 1000, 770, out _accuseModal);
             Ui.VLayout(box, 18, 30, TextAnchor.UpperCenter);
             Ui.Size(Ui.Label(box, "Make this accusation?", 44, Ui.Danger, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, -1, 60);
             Ui.Size(Ui.Label(box, "If you're wrong, you're out of the game and everyone sees your cards.",
                 26, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, -1, 40);
 
             var row = Ui.Rect(box, "Cards");
-            Ui.Size(row, -1, 300);
-            Ui.HLayout(row, 24, 0, TextAnchor.MiddleCenter);
+            Ui.Size(row, -1, 400);
+            Ui.HLayout(row, 20, 0, TextAnchor.MiddleCenter);
             foreach (var t in new[] { CardType.Character, CardType.Room, CardType.Weapon })
-                Ui.Size(new CardWidget(row, _picked[t]).Root, 210, 280);
+                Ui.Size(new CardWidget(row, _picked[t]).Root, 280, 380);
 
             var buttons = Ui.Rect(box, "Buttons");
-            Ui.Size(buttons, -1, 80);
+            Ui.Size(buttons, -1, 104);
             Ui.HLayout(buttons, 20, 0, TextAnchor.MiddleCenter);
             var modal = _accuseModal;
-            Ui.Button(buttons, "Cancel", () => Object.Destroy(modal), Ui.PanelLight, width: 300);
-            Ui.Button(buttons, "Accuse!", () => Send(MsgType.Accuse), Ui.Danger, width: 300);
+            Ui.Button(buttons, "Cancel", () => Object.Destroy(modal), Ui.PanelLight, width: 420, height: 100);
+            Ui.Button(buttons, "Accuse!", () => Send(MsgType.Accuse), Ui.Danger, width: 420, height: 100);
         }
 
         /// <summary>Disabled buttons fade right out so it's obvious they can't be pressed yet.</summary>

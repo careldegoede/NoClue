@@ -46,3 +46,6 @@ desktop.ini
 
 # Unity AI / Pipeline local caches
 **/[Aa]ssets/AI Toolkit/Cache/
+
+# Android native build cache
+**/.utmp/
