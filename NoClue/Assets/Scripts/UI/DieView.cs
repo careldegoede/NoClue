@@ -95,6 +95,20 @@ namespace NoClue.UI
 
             var border = Ui.Panel(rt, "Border", Ui.Background);
             Ui.Stretch(border);
+
+            // Painted face art (Resources/Dice/die_*.png) when available; plain colour + label otherwise.
+            var art = FaceSprite(face);
+            if (art != null)
+            {
+                var img = Ui.Image(border, art, "Face");
+                img.preserveAspect = false;
+                Ui.Stretch(img.rectTransform, 4, 4, 4, 4);   // thin dark edge reads as the die's bevel
+                _faces[side] = img;
+                _faceColors[side] = Color.white;             // Shade() darkens the art itself
+                foreach (Transform t in canvasGo.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = Layer;
+                return;
+            }
+
             var fill = Ui.Panel(border, "Face", FaceColor(face));
             Ui.Stretch(fill, 10, 10, 10, 10);
             _faces[side] = fill.GetComponent<Image>();
@@ -116,6 +130,13 @@ namespace NoClue.UI
 
             foreach (Transform t in canvasGo.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = Layer;
         }
+
+        private static Sprite FaceSprite(DieFace face) => Resources.Load<Sprite>(face switch
+        {
+            DieFace.ShowAll => "Dice/die_show_all",
+            DieFace.Reverse => "Dice/die_reverse",
+            _ => "Dice/die_ask_next",
+        });
 
         public static Color FaceColor(DieFace face) => face switch
         {

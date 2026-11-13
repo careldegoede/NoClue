@@ -10,11 +10,12 @@ namespace NoClue.EditorTools
     internal class NoClueAssetImporter : AssetPostprocessor
     {
         private const string CardsPath = "Assets/Resources/Cards/";
+        private const string DicePath = "Assets/Resources/Dice/";
         private const string AudioPath = "Assets/Resources/Audio/";
 
         private void OnPreprocessTexture()
         {
-            if (!assetPath.StartsWith(CardsPath)) return;
+            if (!assetPath.StartsWith(CardsPath) && !assetPath.StartsWith(DicePath)) return;
 
             var importer = (TextureImporter)assetImporter;
             importer.textureType = TextureImporterType.Sprite;
