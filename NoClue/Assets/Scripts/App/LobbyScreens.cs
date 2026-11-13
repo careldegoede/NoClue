@@ -32,11 +32,7 @@ namespace NoClue.App
             }
             else
             {
-                var title = Ui.Label(column, "NoClue", 140, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
-                var glow = title.gameObject.AddComponent<Outline>();   // blood-red halo behind the gold
-                glow.effectColor = new Color(Ui.Danger.r, Ui.Danger.g, Ui.Danger.b, 0.55f);
-                glow.effectDistance = new Vector2(3, 3);
-                Ui.Size(title.rectTransform, 900, 190);
+                Ui.Size(Ui.Logo(column, 150).rectTransform, 900, 190);
             }
             Ui.Size(Ui.Label(column, "Who did it, where, and with what?", 30, Ui.TextDim, TextAnchor.MiddleCenter,
                 FontStyle.Italic).rectTransform, 700, 60);

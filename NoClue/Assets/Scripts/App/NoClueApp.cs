@@ -72,7 +72,7 @@ namespace NoClue.App
             BuildCanvas();
             BuildMusic();
             Ui.ClickSound = () => PlaySfx("button-click-1", 0.7f);   // every button, card and "?" tap
-            ShowMenu();
+            SetScreen(new SplashScreen(this, _screenRoot));            // mansion intro, then the menu
         }
 
         private void BuildCanvas()
@@ -345,6 +345,8 @@ namespace NoClue.App
             else
             {
                 SetMusic(MusicMode.Game);
+                // straight from the lobby into a new game: a few seconds of the mansion first
+                if (_screen is LobbyScreen && view.phase == Phase.Playing) GameStartCurtain.Show(_overlayRoot, n => PlaySfx(n));
                 if (_screen is not GameScreen) SetScreen(new GameScreen(this, _screenRoot));
             }
             _screen.Refresh(view);

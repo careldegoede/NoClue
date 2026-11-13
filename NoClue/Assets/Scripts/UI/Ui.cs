@@ -27,6 +27,22 @@ namespace NoClue.UI
         public static Font Font => s_Body ??= Resources.Load<Font>("Fonts/CrimsonText-Regular") ?? Builtin;
         public static Font BoldFont => s_BodyBold ??= Resources.Load<Font>("Fonts/CrimsonText-Bold") ?? Font;
         public static Font TitleFont => s_Title ??= Resources.Load<Font>("Fonts/CinzelDecorative-Bold") ?? BoldFont;
+        private static Font s_Logo;
+        public static Font LogoFont => s_Logo ??= Resources.Load<Font>("Fonts/UnifrakturMaguntia-Book") ?? TitleFont;
+
+        /// <summary>The "No~Clue" wordmark in gothic blackletter: gold letters, blood-red tilde, red halo.</summary>
+        public static Text Logo(Transform parent, int size)
+        {
+            var t = Label(parent, "No<color=#B3242B>~</color>Clue", size, Accent, TextAnchor.MiddleCenter);
+            t.font = LogoFont;
+            t.supportRichText = true;
+            t.resizeTextMaxSize = size;
+            t.fontSize = size;
+            var glow = t.gameObject.AddComponent<Outline>();
+            glow.effectColor = new Color(Danger.r, Danger.g, Danger.b, 0.55f);
+            glow.effectDistance = new Vector2(3, 3);
+            return t;
+        }
 
         /// <summary>Played on every button / card tap (set by the app to its click sound).</summary>
         public static Action ClickSound;
