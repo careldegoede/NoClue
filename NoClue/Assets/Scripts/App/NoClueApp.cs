@@ -69,6 +69,7 @@ namespace NoClue.App
         {
             Application.runInBackground = true;   // the host must keep serving while unfocused
             Application.targetFrameRate = 60;
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;   // phones: don't dim/lock mid-game
             BuildCanvas();
             BuildMusic();
             Ui.ClickSound = () => PlaySfx("button-click-1", 0.7f);   // every button, card and "?" tap

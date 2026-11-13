@@ -69,6 +69,7 @@ namespace NoClue.Net
 
         public LanListener()
         {
+            AndroidLan.Acquire();   // Android drops broadcasts without a Wi-Fi multicast lock
             _udp = new UdpClient { ExclusiveAddressUse = false };
             _udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             _udp.Client.Bind(new IPEndPoint(IPAddress.Any, LanDiscovery.Port));
@@ -118,6 +119,7 @@ namespace NoClue.Net
         {
             _running = false;
             _udp.Close();
+            AndroidLan.Release();
         }
     }
 
