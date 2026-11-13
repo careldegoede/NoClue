@@ -195,6 +195,11 @@ namespace NoClue.App
         private readonly Text _hint;
         private readonly Button _start;
         private readonly Text _waiting;
+        private readonly Carousel _carousel;
+        private readonly Text _pageLabel;
+        private readonly Button _choose;
+        private GameView _view;
+        private bool _positioned;
 
         public GameObject Root { get; }
 
@@ -217,24 +222,45 @@ namespace NoClue.App
             _hint = Ui.Label(left, "Choose your character", 30, Ui.TextDim);
             Ui.Size(_hint.rectTransform, -1, 44);
 
-            var grid = Ui.Rect(left, "Grid");
-            Ui.Flex(grid, 1, 1);
-            Ui.Grid(grid, new Vector2(240, 360), 20);
+            // one big character card at a time: swipe / arrows / mouse wheel (phone friendly)
+            var stage = Ui.Rect(left, "Stage");
+            Ui.Flex(stage, 1, 1);
+            _carousel = Carousel.Create(stage, "Characters");
+            Ui.Stretch((RectTransform)_carousel.transform);
             foreach (var id in CardCatalog.Characters)
             {
-                var cell = Ui.Rect(grid, id);
-                var card = new CardWidget(cell, id, OnPick);
-                card.Root.anchorMin = new Vector2(0, 0);
-                card.Root.anchorMax = new Vector2(1, 1);
-                card.Root.offsetMin = new Vector2(0, 40);
-                card.Root.offsetMax = Vector2.zero;
-                var owner = Ui.Label(cell, "", 24, Ui.TextDim, TextAnchor.MiddleCenter);
+                var page = _carousel.AddPage(id);
+                var card = new CardWidget(page, id, OnPick);
+                var rt = card.Root;
+                rt.anchorMin = new Vector2(0.5f, 0);
+                rt.anchorMax = new Vector2(0.5f, 1);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.offsetMin = new Vector2(0, 46);
+                rt.offsetMax = new Vector2(0, -6);
+                var fit = rt.gameObject.AddComponent<AspectRatioFitter>();   // card shape, as tall as fits
+                fit.aspectMode = AspectRatioFitter.AspectMode.HeightControlsWidth;
+                fit.aspectRatio = 896f / 1200f;
+                var owner = Ui.Label(page, "", 26, Ui.TextDim, TextAnchor.MiddleCenter, FontStyle.Bold);
                 owner.rectTransform.anchorMin = new Vector2(0, 0);
                 owner.rectTransform.anchorMax = new Vector2(1, 0);
                 owner.rectTransform.pivot = new Vector2(0.5f, 0);
-                owner.rectTransform.sizeDelta = new Vector2(0, 36);
+                owner.rectTransform.sizeDelta = new Vector2(0, 40);
                 _characters[id] = (card, owner);
             }
+
+            // big thumb-sized arrows on both edges
+            ArrowButton(stage, "«", 0f, _carousel.Previous);
+            ArrowButton(stage, "»", 1f, _carousel.Next);
+
+            // "3 / 8" + the pick button
+            var nav = Ui.Rect(left, "Nav");
+            Ui.Size(nav, -1, 84);
+            Ui.HLayout(nav, 20, 0, TextAnchor.MiddleCenter);
+            _pageLabel = Ui.Label(nav, "", 28, Ui.TextDim, TextAnchor.MiddleCenter);
+            Ui.Size(_pageLabel.rectTransform, 120, 80);
+            _choose = Ui.Button(nav, "Choose", () => OnPick(CardCatalog.Characters[_carousel.Page]),
+                width: 520, height: 80, fontSize: 32);
+            _carousel.PageChanged += _ => UpdatePicker();
 
             // right: players + start
             var right = Ui.Panel(root, "Players", Ui.PanelColor);
@@ -267,8 +293,31 @@ namespace NoClue.App
         private void OnPick(string characterId) =>
             _app.Send(MsgType.PickCharacter, new PickCharacterMsg { characterId = characterId });
 
+        private static void ArrowButton(RectTransform stage, string glyph, float side, UnityEngine.Events.UnityAction onClick)
+        {
+            var b = Ui.Button(stage, glyph, onClick, new Color(0, 0, 0, 0.55f), 56, 96, 150);
+            var rt = (RectTransform)b.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(side, 0.55f);
+            rt.pivot = new Vector2(side, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        /// <summary>Page counter and the Choose button for the card currently in view.</summary>
+        private void UpdatePicker()
+        {
+            _pageLabel.text = $"{_carousel.Page + 1} / {_carousel.PageCount}";
+            if (_view == null) return;
+            string id = CardCatalog.Characters[_carousel.Page];
+            var taker = _view.players.FirstOrDefault(p => p.characterId == id);
+            bool mine = taker != null && taker.id == _view.myPlayerId;
+            string name = CardCatalog.DisplayName(id);
+            Ui.SetButtonLabel(_choose, taker == null ? $"Play as {name}" : mine ? $"You are {name}" : $"Taken by {taker.name}");
+            _choose.interactable = taker == null;
+        }
+
         public void Refresh(GameView view)
         {
+            _view = view;
             var me = view.players.FirstOrDefault(p => p.id == view.myPlayerId);
             var host = view.players.FirstOrDefault(p => p.isHost);
             _title.text = host != null ? $"{host.name}'s game" : "Lobby";
@@ -284,9 +333,21 @@ namespace NoClue.App
                 card.SetSelected(mine);
                 card.SetDimmed(takenByOther);
                 card.SetInteractable(!takenByOther);
-                owner.text = taker == null ? "" : mine ? "You" : taker.name;
-                owner.color = mine ? Ui.Accent : Ui.TextDim;
+                owner.text = taker == null ? "Available" : mine ? "You" : "Taken by " + taker.name;
+                owner.color = mine ? Ui.Accent : taker == null ? Ui.Good : Ui.TextDim;
             }
+
+            // first time in: open on my character, or the first free one
+            if (!_positioned)
+            {
+                _positioned = true;
+                string start = !string.IsNullOrEmpty(me?.characterId)
+                    ? me.characterId
+                    : CardCatalog.Characters.FirstOrDefault(c => view.players.All(p => p.characterId != c));
+                int idx = System.Array.IndexOf(CardCatalog.Characters, start);
+                _carousel.GoTo(Mathf.Max(0, idx), instant: true);
+            }
+            UpdatePicker();
 
             Ui.Clear(_players);
             foreach (var p in view.players)
@@ -296,7 +357,13 @@ namespace NoClue.App
                 Ui.HLayout(row, 16, 8);
                 var img = Ui.Image(row, CardCatalog.GetSprite(p.characterId), "Portrait");
                 Ui.Size(img.rectTransform, 57, 76);
-                string tag = p.isHost ? "  <color=#E0B04A>(host)</color>" : "";
+                if (img.sprite == null)
+                {
+                    // still choosing: a dark placeholder card with a "?" instead of a blank white box
+                    img.color = Ui.PanelLight;
+                    Ui.Stretch(Ui.Label(img.transform, "?", 34, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform);
+                }
+                string tag = p.isHost ? "  <color=#C9A04A>(host)</color>" : "";
                 string choosing = string.IsNullOrEmpty(p.characterId) ? "\n<size=22><color=#9AA0B0>choosing...</color></size>"
                     : $"\n<size=22><color=#9AA0B0>{CardCatalog.DisplayName(p.characterId)}</color></size>";
                 var label = Ui.Label(row, p.name + tag + choosing, 30);
