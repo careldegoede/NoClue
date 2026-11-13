@@ -28,6 +28,12 @@ namespace NoClue.UI
         public static Font BoldFont => s_BodyBold ??= Resources.Load<Font>("Fonts/CrimsonText-Bold") ?? Font;
         public static Font TitleFont => s_Title ??= Resources.Load<Font>("Fonts/CinzelDecorative-Bold") ?? BoldFont;
 
+        /// <summary>Played on every button / card tap (set by the app to its click sound).</summary>
+        public static Action ClickSound;
+
+        /// <summary>Adds the click sound to a button.</summary>
+        public static void AddClick(Button b) => b.onClick.AddListener(() => ClickSound?.Invoke());
+
         /// <summary>Optional theme art from Resources/Theme (null until the art exists).</summary>
         public static Sprite ThemeSprite(string name) => Resources.Load<Sprite>("Theme/" + name);
 
@@ -121,6 +127,7 @@ namespace NoClue.UI
             colors.pressedColor = new Color(0.75f, 0.7f, 0.7f);
             colors.disabledColor = new Color(0.45f, 0.45f, 0.45f, 0.6f);
             btn.colors = colors;
+            AddClick(btn);
             if (onClick != null) btn.onClick.AddListener(onClick);
 
             // Buttons use the engraved title face, sized to the button.

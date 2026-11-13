@@ -37,6 +37,7 @@ namespace NoClue.UI
             if (onClick != null)
             {
                 Button = Root.gameObject.AddComponent<Button>();
+                Ui.AddClick(Button);
                 Button.onClick.AddListener(() => onClick(cardId));
             }
 
@@ -87,6 +88,7 @@ namespace NoClue.UI
             toggle.sizeDelta = new Vector2(44, 44);
             _suspectButtonBg = toggle.GetComponent<Image>();
             _suspectButton = toggle.gameObject.AddComponent<Button>();
+            Ui.AddClick(_suspectButton);
             _suspectButton.onClick.AddListener(() => onToggleSuspect(cardId));
             var q = Ui.Label(toggle, "?", 30, Ui.TextColor, TextAnchor.MiddleCenter, FontStyle.Bold);
             Ui.Stretch(q.rectTransform);

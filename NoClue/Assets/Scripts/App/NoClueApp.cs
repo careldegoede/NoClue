@@ -71,6 +71,7 @@ namespace NoClue.App
             Application.targetFrameRate = 60;
             BuildCanvas();
             BuildMusic();
+            Ui.ClickSound = () => PlaySfx("button-click-1", 0.7f);   // every button, card and "?" tap
             ShowMenu();
         }
 
