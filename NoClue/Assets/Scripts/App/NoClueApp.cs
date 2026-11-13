@@ -94,8 +94,17 @@ namespace NoClue.App
 
             var bg = Ui.Panel(canvasGo.transform, "Background", Ui.Background);
             Ui.Stretch(bg);
+            var table = Ui.ThemeSprite("table_background");   // painted backdrop, when the art exists
+            if (table != null)
+            {
+                var img = bg.GetComponent<Image>();
+                img.sprite = table;
+                img.color = new Color(0.55f, 0.5f, 0.5f);       // keep it dark so cards and text pop
+                img.preserveAspect = false;
+            }
             _screenRoot = Ui.Stretch(Ui.Rect(canvasGo.transform, "Screen"));
-            _overlayRoot = Ui.Stretch(Ui.Rect(canvasGo.transform, "Overlay"));
+            ScreenFx.Create(canvasGo.transform, bg, _screenRoot);   // fog behind, vignette/grain/flash in front
+            _overlayRoot = Ui.Stretch(Ui.Rect(canvasGo.transform, "Overlay"));   // toasts stay on top
         }
 
         private void BuildMusic()

@@ -28,6 +28,10 @@ namespace NoClue.App
         private GameView _view;
         private readonly Dictionary<CardType, string> _picked = new();
 
+        // atmosphere: pulsing "your turn" text, and flashes/shakes for big moments in the log
+        private Text _pulseText;
+        private string[] _prevLog;
+
         // private notebook: cards I've marked as suspects (saved on this device per game + seat)
         private readonly HashSet<string> _suspects = new();
         private string _suspectPrefKey;
@@ -108,6 +112,7 @@ namespace NoClue.App
             side.offsetMin = new Vector2(-470, 20);
             side.offsetMax = new Vector2(-20, -300);
             Ui.VLayout(side, 14, 20);
+            Ui.StyleFrame(side);
 
             _actions = Ui.Rect(side, "Actions");
             Ui.VLayout(_actions, 12);
@@ -156,6 +161,7 @@ namespace NoClue.App
             }
             _waitingOn.RemoveWhere(id => Player(id) is { connected: true });
             LoadSuspects();
+            ReactToNewLogLines();
 
             // first view (or after a rejoin): don't replay old throws and reveals
             if (_seenRollSeq < 0) _seenRollSeq = view.rollSeq;
@@ -226,9 +232,37 @@ namespace NoClue.App
             }
         }
 
+        /// <summary>Red flash + shake when someone is knocked out, gold flash on a win, etc.</summary>
+        private void ReactToNewLogLines()
+        {
+            var log = _view.log;
+            var prev = _prevLog;
+            _prevLog = log;
+            if (prev == null || prev.Length == 0 || ScreenFx.Instance == null) return;   // first view: no replay
+
+            int from = System.Array.LastIndexOf(log, prev[prev.Length - 1]) + 1;
+            if (from <= 0) return;   // can't line the logs up (e.g. after a rejoin): skip rather than replay
+            var fx = ScreenFx.Instance;
+            for (int i = from; i < log.Length; i++)
+            {
+                string line = log[i];
+                if (line.Contains("is out!"))   // wrong accusation
+                {
+                    fx.Flash(new Color(0.7f, 0.02f, 0.05f, 0.55f), 0.9f);
+                    fx.Shake(18f);
+                    _app.PlaySfx("loser-noooh");
+                }
+                else if (line.Contains("CORRECT")) fx.Flash(new Color(1f, 0.8f, 0.3f, 0.45f), 1.2f);
+                else if (line.Contains("reversed")) { fx.Flash(new Color(0.7f, 0.02f, 0.05f, 0.3f), 0.5f); fx.Shake(8f); }
+                else if (line.Contains("Revealed to everyone") || line.Contains("Nobody else holds"))
+                    fx.Flash(new Color(0.4f, 0.55f, 0.9f, 0.3f), 0.6f);
+            }
+        }
+
         private void RefreshBanner()
         {
             Ui.Clear(_banner);
+            _pulseText = null;
             var me = Me;
             var ask = _view.ask;
 
@@ -288,7 +322,7 @@ namespace NoClue.App
             var active = Player(_view.activePlayerId);
             string prefix = me != null && (me.eliminated || me.ejected) ? "You're out, watching.  " : "";
             if (active != null && active.id == _view.myPlayerId)
-                BannerText("Your turn! Pick 3 cards, then spin the die or make an accusation.", Ui.Accent);
+                _pulseText = BannerText("Your turn! Pick 3 cards, then spin the die or make an accusation.", Ui.Accent);
             else if (active != null)
             {
                 BannerPortrait(active);
@@ -303,12 +337,16 @@ namespace NoClue.App
             Ui.Size(img.rectTransform, 60, 80);
         }
 
-        private void BannerText(string text, Color color)
+        private Text BannerText(string text, Color color)
         {
             var t = Ui.Label(_banner, text, 30, color, TextAnchor.MiddleLeft, FontStyle.Bold);
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             var fitter = t.gameObject.AddComponent<ContentSizeFitter>();
             fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var shadow = t.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, 0.8f);
+            shadow.effectDistance = new Vector2(2, -2);
+            return t;
         }
 
         private void RefreshCards()
@@ -829,6 +867,13 @@ namespace NoClue.App
 
         public void Tick()
         {
+            // "Your turn!" glows between old gold and blood red, like a candle catching
+            if (_pulseText != null)
+            {
+                float k = (Mathf.Sin(Time.unscaledTime * 3f) + 1f) * 0.5f;
+                _pulseText.color = Color.Lerp(Ui.Accent, Color.Lerp(Ui.Danger, Color.white, 0.25f), k);
+            }
+
             // game over drumroll finished: reveal the winner and the solution
             if (_gameOverRevealAt > 0 && Time.unscaledTime >= _gameOverRevealAt)
             {

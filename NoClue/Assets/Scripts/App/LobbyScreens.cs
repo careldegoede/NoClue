@@ -22,11 +22,24 @@ namespace NoClue.App
 
             var column = Ui.Rect(root, "Column");
             column.anchorMin = column.anchorMax = new Vector2(0.5f, 0.5f);
-            column.sizeDelta = new Vector2(700, 760);
+            column.sizeDelta = new Vector2(900, 800);
             Ui.VLayout(column, 26, 0, TextAnchor.MiddleCenter, expandWidth: false);
 
-            Ui.Size(Ui.Label(column, "NoClue", 140, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold).rectTransform, 700, 170);
-            Ui.Size(Ui.Label(column, "Who did it, where, and with what?", 34, Ui.TextDim, TextAnchor.MiddleCenter).rectTransform, 700, 60);
+            var logo = Ui.ThemeSprite("logo");
+            if (logo != null)
+            {
+                Ui.Size(Ui.Image(column, logo, "Logo").rectTransform, 900, 260);
+            }
+            else
+            {
+                var title = Ui.Label(column, "NoClue", 140, Ui.Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+                var glow = title.gameObject.AddComponent<Outline>();   // blood-red halo behind the gold
+                glow.effectColor = new Color(Ui.Danger.r, Ui.Danger.g, Ui.Danger.b, 0.55f);
+                glow.effectDistance = new Vector2(3, 3);
+                Ui.Size(title.rectTransform, 900, 190);
+            }
+            Ui.Size(Ui.Label(column, "Who did it, where, and with what?", 30, Ui.TextDim, TextAnchor.MiddleCenter,
+                FontStyle.Italic).rectTransform, 700, 60);
             Ui.Size(Ui.Rect(column, "Gap"), 10, 30);
 
             Ui.Size(Ui.Label(column, "Your name", 26, Ui.TextDim, TextAnchor.LowerLeft).rectTransform, 520, 34);

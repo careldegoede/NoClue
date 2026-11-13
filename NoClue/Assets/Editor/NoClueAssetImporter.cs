@@ -11,10 +11,31 @@ namespace NoClue.EditorTools
     {
         private const string CardsPath = "Assets/Resources/Cards/";
         private const string DicePath = "Assets/Resources/Dice/";
+        private const string ThemePath = "Assets/Resources/Theme/";
         private const string AudioPath = "Assets/Resources/Audio/";
 
         private void OnPreprocessTexture()
         {
+            if (assetPath.StartsWith(ThemePath))
+            {
+                // UI theme art: full-size sprites; frames and buttons are 9-sliced so they stretch cleanly.
+                var theme = (TextureImporter)assetImporter;
+                theme.textureType = TextureImporterType.Sprite;
+                theme.spriteImportMode = SpriteImportMode.Single;
+                theme.mipmapEnabled = false;
+                theme.maxTextureSize = 2048;
+                theme.textureCompression = TextureImporterCompression.Compressed;
+                theme.alphaIsTransparency = true;
+                string file = System.IO.Path.GetFileNameWithoutExtension(assetPath);
+                theme.spriteBorder = file switch
+                {
+                    "panel_frame" => new Vector4(110, 110, 110, 110),   // left, bottom, right, top (px)
+                    "button" => new Vector4(48, 48, 48, 48),
+                    _ => Vector4.zero,
+                };
+                return;
+            }
+
             if (!assetPath.StartsWith(CardsPath) && !assetPath.StartsWith(DicePath)) return;
 
             var importer = (TextureImporter)assetImporter;

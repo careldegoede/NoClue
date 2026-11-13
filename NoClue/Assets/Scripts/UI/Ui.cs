@@ -5,22 +5,31 @@ using UnityEngine.UI;
 
 namespace NoClue.UI
 {
-    /// <summary>Tiny helpers for building uGUI from code.</summary>
+    /// <summary>Tiny helpers for building uGUI from code, with the "spooky mansion" theme baked in.</summary>
     public static class Ui
     {
-        public static readonly Color Background = Hex("#16181E");
-        public static readonly Color PanelColor = Hex("#232733");
-        public static readonly Color PanelLight = Hex("#2E3342");
-        public static readonly Color Accent = Hex("#E0B04A");
-        public static readonly Color AccentDark = Hex("#8F6B22");
-        public static readonly Color TextColor = Hex("#ECEDF2");
-        public static readonly Color TextDim = Hex("#9AA0B0");
-        public static readonly Color Danger = Hex("#C8504A");
-        public static readonly Color Good = Hex("#4FA36B");
-        public static readonly Color Blue = Hex("#4A7FC8");
+        // Spooky mansion palette: candle-lit near-black, aged parchment, old gold, blood red.
+        public static readonly Color Background = Hex("#0C0A0E");
+        public static readonly Color PanelColor = Hex("#17121A");
+        public static readonly Color PanelLight = Hex("#261D27");
+        public static readonly Color Accent = Hex("#C9A04A");
+        public static readonly Color AccentDark = Hex("#7A5A22");
+        public static readonly Color TextColor = Hex("#EADFC8");
+        public static readonly Color TextDim = Hex("#9D917C");
+        public static readonly Color Danger = Hex("#B3242B");
+        public static readonly Color Good = Hex("#4F8A5B");
+        public static readonly Color Blue = Hex("#4E6E9E");
 
-        private static Font s_Font;
-        public static Font Font => s_Font ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        // Fonts (Resources/Fonts, SIL Open Font License). Big text uses the engraved title face.
+        private const int TitleFontFrom = 34;
+        private static Font s_Body, s_BodyBold, s_Title, s_Builtin;
+        private static Font Builtin => s_Builtin ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        public static Font Font => s_Body ??= Resources.Load<Font>("Fonts/CrimsonText-Regular") ?? Builtin;
+        public static Font BoldFont => s_BodyBold ??= Resources.Load<Font>("Fonts/CrimsonText-Bold") ?? Font;
+        public static Font TitleFont => s_Title ??= Resources.Load<Font>("Fonts/CinzelDecorative-Bold") ?? BoldFont;
+
+        /// <summary>Optional theme art from Resources/Theme (null until the art exists).</summary>
+        public static Sprite ThemeSprite(string name) => Resources.Load<Sprite>("Theme/" + name);
 
         public static Color Hex(string hex) => ColorUtility.TryParseHtmlString(hex, out var c) ? c : Color.magenta;
 
@@ -45,10 +54,29 @@ namespace NoClue.UI
         {
             var rt = Rect(parent, "Label");
             var t = rt.gameObject.AddComponent<Text>();
-            t.font = Font;
+            bool title = size >= TitleFontFrom;
+            if (title)
+            {
+                // engraved display face; shrinks to fit so long headlines never spill
+                t.font = TitleFont;
+                t.fontStyle = FontStyle.Normal;
+                t.fontSize = Mathf.RoundToInt(size * 0.9f);
+                t.resizeTextForBestFit = true;
+                t.resizeTextMaxSize = t.fontSize;
+                t.resizeTextMinSize = Mathf.Max(14, Mathf.RoundToInt(size * 0.5f));
+                var shadow = t.gameObject.AddComponent<Shadow>();
+                shadow.effectColor = new Color(0, 0, 0, 0.85f);
+                shadow.effectDistance = new Vector2(2, -3);
+            }
+            else
+            {
+                // book serif is a little smaller than the old sans, so nudge it up
+                bool bold = (style & FontStyle.Bold) != 0;
+                t.font = bold ? BoldFont : Font;
+                t.fontStyle = bold ? style & ~FontStyle.Bold : style;
+                t.fontSize = Mathf.RoundToInt(size * 1.1f);
+            }
             t.text = text;
-            t.fontSize = size;
-            t.fontStyle = style;
             t.color = color ?? TextColor;
             t.alignment = align;
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -70,18 +98,38 @@ namespace NoClue.UI
         public static Button Button(Transform parent, string label, UnityAction onClick, Color? color = null,
             int fontSize = 30, float width = 320, float height = 80)
         {
-            var rt = Panel(parent, "Button " + label, color ?? Accent);
+            var fill = color ?? Accent;
+            var rt = Panel(parent, "Button " + label, fill);
+            var img = rt.GetComponent<Image>();
+            var art = ThemeSprite("button");
+            if (art != null)
+            {
+                img.sprite = art;
+                img.type = UnityEngine.UI.Image.Type.Sliced;
+                img.color = fill == Accent ? Color.white : Color.Lerp(fill, Color.white, 0.25f);
+            }
+            var outline = rt.gameObject.AddComponent<Outline>();          // thin old-gold rim
+            outline.effectColor = new Color(Accent.r, Accent.g, Accent.b, fill == Accent ? 0.0f : 0.55f);
+            outline.effectDistance = new Vector2(2, 2);
+            var drop = rt.gameObject.AddComponent<Shadow>();
+            drop.effectColor = new Color(0, 0, 0, 0.6f);
+            drop.effectDistance = new Vector2(3, -4);
+
             var btn = rt.gameObject.AddComponent<Button>();
             var colors = btn.colors;
-            colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f);
-            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f);
+            colors.highlightedColor = new Color(1.15f, 1.1f, 1.05f);
+            colors.pressedColor = new Color(0.75f, 0.7f, 0.7f);
             colors.disabledColor = new Color(0.45f, 0.45f, 0.45f, 0.6f);
             btn.colors = colors;
             if (onClick != null) btn.onClick.AddListener(onClick);
 
-            var text = Label(rt, label, fontSize, (color ?? Accent) == Accent ? Background : TextColor,
+            // Buttons use the engraved title face, sized to the button.
+            var text = Label(rt, label, Mathf.Max(fontSize, TitleFontFrom), fill == Accent ? Background : TextColor,
                 TextAnchor.MiddleCenter, FontStyle.Bold);
-            Stretch(text.rectTransform);
+            text.resizeTextMaxSize = Mathf.RoundToInt(fontSize * 0.95f);
+            text.resizeTextMinSize = 12;
+            if (fill == Accent && text.TryGetComponent<Shadow>(out var s)) s.effectColor = new Color(1, 1, 1, 0.25f);
+            Stretch(text.rectTransform, 10, 4, 10, 4);
             Size(rt, width, height);
             return btn;
         }
@@ -212,14 +260,38 @@ namespace NoClue.UI
         /// <summary>Full-screen dimmer with a centered panel; returns the panel.</summary>
         public static RectTransform Modal(Transform parent, string name, float width, float height, out GameObject root)
         {
-            var dim = Panel(parent, name, new Color(0, 0, 0, 0.72f));
+            var dim = Panel(parent, name, new Color(0.04f, 0, 0.01f, 0.8f));   // blood-black dimmer
             Stretch(dim);
             root = dim.gameObject;
 
             var box = Panel(dim, "Box", PanelColor);
             box.anchorMin = box.anchorMax = new Vector2(0.5f, 0.5f);
             box.sizeDelta = new Vector2(width, height);
+            StyleFrame(box);
+            box.gameObject.AddComponent<PopIn>();
             return box;
+        }
+
+        /// <summary>Old-gold rim + deep shadow, or the painted frame art when it exists.</summary>
+        public static void StyleFrame(RectTransform panel)
+        {
+            var img = panel.GetComponent<Image>();
+            var art = ThemeSprite("panel_frame");
+            if (art != null)
+            {
+                img.sprite = art;
+                img.type = UnityEngine.UI.Image.Type.Sliced;
+                img.color = Color.white;
+            }
+            else
+            {
+                var rim = panel.gameObject.AddComponent<Outline>();
+                rim.effectColor = new Color(Accent.r, Accent.g, Accent.b, 0.8f);
+                rim.effectDistance = new Vector2(3, 3);
+            }
+            var shadow = panel.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, 0.75f);
+            shadow.effectDistance = new Vector2(10, -14);
         }
 
         /// <summary>Never use "GetComponent() ?? AddComponent()": Unity's fake-null objects defeat "??".</summary>
